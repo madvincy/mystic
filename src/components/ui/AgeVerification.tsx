@@ -367,7 +367,7 @@ export default function AgeVerification({
                           <ChevronRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
                         </button>
 
-                        <button
+                        {/* <button
                           onClick={() => {
                             setCurrentStep('question')
                             setCurrentQuestion(generateQuestion())
@@ -379,7 +379,7 @@ export default function AgeVerification({
                             <span className="font-medium">Answer a Question</span>
                           </div>
                           <ChevronRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
-                        </button>
+                        </button> */}
                       </div>
 
                       <div className="text-center">

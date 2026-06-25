@@ -164,7 +164,7 @@ export default function ProductCard({
               </div>
             )}
             <div className="absolute top-4 right-4">
-              <WishlistButton productId={product.id} variantId={selectedVariant?.id} />
+              <WishlistButton productId={product.id} variantId={selectedVariant?.id || null} />
             </div>
           </div>
           <div className="p-6 flex flex-col justify-center">
@@ -320,7 +320,7 @@ export default function ProductCard({
           <div className="absolute top-2 right-2">
             <WishlistButton 
               productId={product.id}
-              variantId={selectedVariant?.id}
+              variantId={selectedVariant?.id || null}
             />
           </div>
         </div>

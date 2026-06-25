@@ -13,14 +13,14 @@ import { useAuth } from '@/lib/hooks/useAuth'
 
 interface WishlistButtonProps {
   productId: string
-  variantId?: string
+  variantId?: string | null // Allow null
   className?: string
   size?: 'sm' | 'md' | 'lg'
 }
 
 export default function WishlistButton({ 
   productId, 
-  variantId, 
+  variantId = null, // Default to null instead of undefined
   className = '',
   size = 'md'
 }: WishlistButtonProps) {
@@ -32,9 +32,16 @@ export default function WishlistButton({
   const wishlistItems = useSelector((state: RootState) => state.wishlist.items)
   const wishlistError = useSelector((state: RootState) => state.wishlist.error)
 
-  // Check if product is in wishlist
+  // Check if product is in wishlist - handle null variantId
   const inWishlist = wishlistItems.some(
-    w => w.product_id === productId && w.variant_id === (variantId || '')
+    w => {
+      // If variantId is null or undefined, match products without variant
+      if (!variantId) {
+        return w.product_id === productId && !w.variant_id
+      }
+      // Otherwise match both product and variant
+      return w.product_id === productId && w.variant_id === variantId
+    }
   )
 
   // Update local state when wishlist changes
@@ -48,18 +55,6 @@ export default function WishlistButton({
       toast.error(wishlistError)
     }
   }, [wishlistError])
-
-  const sizeClasses = {
-    sm: 'p-1.5',
-    md: 'p-2',
-    lg: 'p-3'
-  }
-
-  const iconSizes = {
-    sm: 'h-4 w-4',
-    md: 'h-5 w-5',
-    lg: 'h-6 w-6'
-  }
 
   const handleToggle = async (e: React.MouseEvent) => {
     e.preventDefault()
@@ -88,7 +83,7 @@ export default function WishlistButton({
     setIsLoading(true)
     
     try {
-      console.log('🔄 Toggling wishlist for product:', productId)
+      console.log('🔄 Toggling wishlist for product:', productId, 'variant:', variantId || 'none')
       
       // Optimistic update
       setLocalInWishlist(!localInWishlist)
@@ -96,7 +91,7 @@ export default function WishlistButton({
       const result = await dispatch(toggleWishlist({
         userId: user.id,
         productId,
-        variantId
+        variantId: variantId || undefined // Pass undefined if null/empty
       })).unwrap()
       
       // Refresh wishlist to ensure consistency
@@ -125,16 +120,16 @@ export default function WishlistButton({
     }
   }
 
-  // Show loading state while checking wishlist
-  if (status === 'loading') {
-    return (
-      <div className={cn(
-        "rounded-full bg-gray-100 dark:bg-gray-800 animate-pulse",
-        sizeClasses[size]
-      )}>
-        <div className={cn("bg-gray-300 dark:bg-gray-600 rounded-full", iconSizes[size])} />
-      </div>
-    )
+  const sizeClasses = {
+    sm: 'p-1.5',
+    md: 'p-2',
+    lg: 'p-3'
+  }
+
+  const iconSizes = {
+    sm: 'h-4 w-4',
+    md: 'h-5 w-5',
+    lg: 'h-6 w-6'
   }
 
   return (
