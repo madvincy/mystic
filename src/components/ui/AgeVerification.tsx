@@ -1,9 +1,27 @@
 // src/components/ui/AgeVerification.tsx
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Wine, Check, AlertCircle, Sparkles, Calendar, Brain, Heart, X, Shield, Lock } from 'lucide-react'
+import { 
+  Shield, 
+  Check, 
+  X, 
+  Calendar, 
+  Brain, 
+  Sparkles, 
+  Lock, 
+  Heart,
+  Wine,
+  GlassWater,
+  ChevronRight,
+  ArrowRight,
+  Award,
+  Clock,
+  Users,
+  Star,
+  PartyPopper
+} from 'lucide-react'
 import { Button } from '@/components/shadCn/ui/button'
 import { cn } from '@/lib/utils'
 import Link from 'next/link'
@@ -11,352 +29,541 @@ import { toast } from 'sonner'
 
 interface AgeVerificationProps {
   className?: string
+  daysUntilReVerify?: number // Default: 30 days
 }
 
 interface Question {
   id: string
   text: string
   correctAnswer: 'yes' | 'no'
-  date: Date
   hint: string
   explanation: string
+  difficulty: 'easy' | 'medium' | 'hard'
 }
 
-export default function AgeVerification({ className = '' }: AgeVerificationProps) {
-  const [showModal, setShowModal] = useState(false)
+export default function AgeVerification({ 
+  className = '', 
+  daysUntilReVerify = 30 
+}: AgeVerificationProps) {
+  // State
   const [isVerified, setIsVerified] = useState(false)
+  const [showModal, setShowModal] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+  const [currentStep, setCurrentStep] = useState<'welcome' | 'date' | 'question' | 'success' | 'denied'>('welcome')
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null)
-  const [isUnderage, setIsUnderage] = useState(false)
+  const [showHint, setShowHint] = useState(false)
   const [attemptCount, setAttemptCount] = useState(0)
   const [score, setScore] = useState(0)
-  const [showHint, setShowHint] = useState(false)
-  const [loading, setLoading] = useState(true)
-  const [isMounted, setIsMounted] = useState(false)
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null)
-  const [showDatePicker, setShowDatePicker] = useState(false)
-  const [verificationMethod, setVerificationMethod] = useState<'question' | 'date' | 'both'>('both')
+  const [selectedMethod, setSelectedMethod] = useState<'date' | 'question'>('date')
+  const [birthYear, setBirthYear] = useState('')
+  const [birthMonth, setBirthMonth] = useState('')
+  const [birthDay, setBirthDay] = useState('')
+  const [error, setError] = useState('')
 
-  // ✅ Generate a random date between 18 and 80 years ago
-  const generateRandomDate = useCallback((): Date => {
+  // Refs
+  const isInitialized = useRef(false)
+  const modalRef = useRef<HTMLDivElement>(null)
+
+  // ✅ Generate random question
+  const generateQuestion = useCallback((): Question => {
     const today = new Date()
-    const minAge = 18
-    const maxAge = 80
-    const randomAge = Math.floor(Math.random() * (maxAge - minAge + 1)) + minAge
-    const date = new Date(today)
-    date.setFullYear(today.getFullYear() - randomAge)
-    date.setMonth(Math.floor(Math.random() * 12))
-    date.setDate(Math.floor(Math.random() * 28) + 1)
-    return date
+    const questions: Question[] = [
+      {
+        id: `q-${Date.now()}-1`,
+        text: `Were you born before ${new Date(today.getFullYear() - 20, 0, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}?`,
+        correctAnswer: 'yes',
+        hint: 'Think about when you were born',
+        explanation: 'Anyone born before 2004 is at least 20 years old.',
+        difficulty: 'easy'
+      },
+      {
+        id: `q-${Date.now()}-2`,
+        text: `Were you born after ${new Date(today.getFullYear() - 15, 11, 31).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}?`,
+        correctAnswer: 'no',
+        hint: 'If you were born after 2009, you\'re under 15',
+        explanation: 'Anyone born after 2009 is under 15 years old.',
+        difficulty: 'easy'
+      },
+      {
+        id: `q-${Date.now()}-3`,
+        text: `Are you at least 21 years old?`,
+        correctAnswer: 'yes',
+        hint: 'Legal drinking age in some countries is 21',
+        explanation: 'You must be at least 18 to enter, but 21+ gets bonus access.',
+        difficulty: 'medium'
+      },
+      {
+        id: `q-${Date.now()}-4`,
+        text: `Were you born before ${new Date(today.getFullYear() - 25, 0, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}?`,
+        correctAnswer: 'yes',
+        hint: 'The 90s were a great decade!',
+        explanation: 'If you were born before 1999, you\'re at least 25.',
+        difficulty: 'medium'
+      },
+      {
+        id: `q-${Date.now()}-5`,
+        text: `Were you born after ${new Date(today.getFullYear() - 18, 0, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}?`,
+        correctAnswer: 'no',
+        hint: 'That would make you under 18',
+        explanation: 'You must be born before 2006 to be at least 18.',
+        difficulty: 'easy'
+      }
+    ]
+
+    // Shuffle and pick one
+    const shuffled = questions.sort(() => 0.5 - Math.random())
+    return shuffled[0] || questions[0]
   }, [])
 
-  // ✅ Generate a question with better logic
-  const generateQuestion = useCallback((): Question => {
-    const date = generateRandomDate()
-    const today = new Date()
-    const age = today.getFullYear() - date.getFullYear()
-    const isOver18 = age >= 18
-    
-    // Randomize question type
-    const questionTypes = ['before', 'after', 'age', 'year']
-    const type = questionTypes[Math.floor(Math.random() * questionTypes.length)]
-    
-    let text: string
-    let correctAnswer: 'yes' | 'no'
-    let explanation: string
-    
-    switch (type) {
-      case 'before':
-        text = `Were you born before ${date.toLocaleDateString('en-US', { 
-          day: 'numeric', 
-          month: 'long', 
-          year: 'numeric' 
-        })}?`
-        correctAnswer = isOver18 ? 'yes' : 'no'
-        explanation = isOver18 
-          ? `This date is ${age} years ago, so if you were born before it, you're at least ${age} years old.`
-          : `This date is only ${age} years ago, so if you were born before it, you'd be ${age} years old.`
-        break
-        
-      case 'after':
-        text = `Were you born after ${date.toLocaleDateString('en-US', { 
-          day: 'numeric', 
-          month: 'long', 
-          year: 'numeric' 
-        })}?`
-        correctAnswer = isOver18 ? 'no' : 'yes'
-        explanation = isOver18 
-          ? `This date is ${age} years ago, so if you were born after it, you'd be younger than ${age}.`
-          : `This date is only ${age} years ago, so if you were born after it, you'd be ${age} or younger.`
-        break
-        
-      case 'age':
-        const randomAge = Math.floor(Math.random() * 20) + 18
-        text = `Are you at least ${randomAge} years old?`
-        correctAnswer = randomAge <= 18 ? 'yes' : 'no'
-        explanation = `You must be at least 18 years old to enter.`
-        break
-        
-      case 'year':
-        const year = new Date().getFullYear() - 18
-        text = `Were you born in or before ${year}?`
-        correctAnswer = 'yes'
-        explanation = `Anyone born in or before ${year} is at least 18 years old.`
-        break
-        
-      default:
-        text = `Were you born before ${date.toLocaleDateString('en-US', { 
-          day: 'numeric', 
-          month: 'long', 
-          year: 'numeric' 
-        })}?`
-        correctAnswer = isOver18 ? 'yes' : 'no'
-        explanation = `This date is ${age} years ago.`
-    }
-
-    return {
-      id: `q-${Date.now()}-${Math.random()}`,
-      text,
-      correctAnswer,
-      date,
-      hint: `Think about your age and the date mentioned.`,
-      explanation
-    }
-  }, [generateRandomDate])
-
-  // ✅ Check if user is of legal age based on birth date
+  // ✅ Check legal age
   const isLegalAge = useCallback((birthDate: Date): boolean => {
     const today = new Date()
-    const age = today.getFullYear() - birthDate.getFullYear()
+    let age = today.getFullYear() - birthDate.getFullYear()
     const monthDiff = today.getMonth() - birthDate.getMonth()
-    const dayDiff = today.getDate() - birthDate.getDate()
-    
-    // Adjust age if birthday hasn't occurred yet this year
-    if (monthDiff < 0 || (monthDiff === 0 && dayDiff < 0)) {
-      return age - 1 >= 18
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--
     }
     return age >= 18
   }, [])
 
-  // ✅ Handle date selection verification
-  const handleDateVerification = useCallback(() => {
-    if (!selectedDate) {
-      alert('Please select your birth date')
+  // ✅ Verify age via date
+  const verifyByDate = useCallback(() => {
+    if (!birthYear || !birthMonth || !birthDay) {
+      setError('Please enter your full birth date')
       return
     }
 
-    if (isLegalAge(selectedDate)) {
-      // ✅ User is 18 or older
-      localStorage.setItem('age_verified', 'true')
-      localStorage.setItem('age_verification_date', selectedDate.toISOString())
-      localStorage.setItem('age_verification_method', 'date')
+    const year = parseInt(birthYear)
+    const month = parseInt(birthMonth) - 1
+    const day = parseInt(birthDay)
+    
+    if (isNaN(year) || isNaN(month) || isNaN(day)) {
+      setError('Please enter a valid date')
+      return
+    }
+
+    const birthDate = new Date(year, month, day)
+    
+    // Validate date
+    if (birthDate.getFullYear() !== year || 
+        birthDate.getMonth() !== month || 
+        birthDate.getDate() !== day) {
+      setError('Please enter a valid date')
+      return
+    }
+
+    if (isLegalAge(birthDate)) {
+      // ✅ Verified
+      const verificationData = {
+        verified: true,
+        date: birthDate.toISOString(),
+        method: 'date',
+        timestamp: new Date().toISOString()
+      }
+      localStorage.setItem('age_verification', JSON.stringify(verificationData))
       setIsVerified(true)
       setShowModal(false)
+      setCurrentStep('success')
       document.body.style.overflow = 'unset'
-      toast.success('Welcome! You are verified as 18+')
+      toast.success('🎉 Welcome! You are verified as 18+')
     } else {
-      // ❌ User is underage
-      setIsUnderage(true)
+      // ❌ Underage
+      setError('You must be at least 18 years old to enter')
       setAttemptCount(prev => prev + 1)
-      setScore(0)
-      toast.error('You must be at least 18 years old to enter')
+      toast.error('Age verification failed')
+      
+      if (attemptCount >= 2) {
+        setCurrentStep('denied')
+      }
     }
-  }, [selectedDate, isLegalAge])
+  }, [birthYear, birthMonth, birthDay, isLegalAge, attemptCount])
 
-  // ✅ Handle question answer
-  const handleAnswer = useCallback((answer: 'yes' | 'no') => {
+  // ✅ Verify via question
+  const verifyByQuestion = useCallback((answer: 'yes' | 'no') => {
     if (!currentQuestion) return
 
     const isCorrect = answer === currentQuestion.correctAnswer
     
     if (isCorrect) {
-      // ✅ User passed the question
-      localStorage.setItem('age_verified', 'true')
-      localStorage.setItem('age_verification_method', 'question')
+      // ✅ Verified
+      const verificationData = {
+        verified: true,
+        method: 'question',
+        timestamp: new Date().toISOString(),
+        score: score + 1
+      }
+      localStorage.setItem('age_verification', JSON.stringify(verificationData))
       setIsVerified(true)
       setShowModal(false)
+      setCurrentStep('success')
       document.body.style.overflow = 'unset'
-      setScore(prev => prev + 1)
-      toast.success('Welcome! You are verified as 18+')
+      toast.success('🎉 Welcome! You are verified as 18+')
     } else {
-      // ❌ User failed
-      setIsUnderage(true)
+      // ❌ Failed
+      setError('Incorrect answer. Please try again.')
       setAttemptCount(prev => prev + 1)
-      setScore(0)
-      toast.error('Verification failed. Please try again.')
+      toast.error('Verification failed')
+      
+      if (attemptCount >= 2) {
+        setCurrentStep('denied')
+      } else {
+        // Generate new question
+        setCurrentQuestion(generateQuestion())
+        setShowHint(false)
+      }
     }
-  }, [currentQuestion])
+  }, [currentQuestion, generateQuestion, score, attemptCount])
 
-  // ✅ Generate new question
-  const generateNewQuestion = useCallback(() => {
-    setCurrentQuestion(generateQuestion())
-    setShowHint(false)
-    setLoading(false)
-  }, [generateQuestion])
+  // ✅ Check existing verification
+  const checkVerification = useCallback(() => {
+    try {
+      const stored = localStorage.getItem('age_verification')
+      if (!stored) return false
 
-  // ✅ Reset and try again
-  const handleReset = useCallback(() => {
-    setIsUnderage(false)
-    setAttemptCount(0)
-    setScore(0)
-    setSelectedDate(null)
-    generateNewQuestion()
-  }, [generateNewQuestion])
+      const data = JSON.parse(stored)
+      if (!data.verified) return false
+
+      // Check if verification has expired
+      const verificationDate = new Date(data.timestamp)
+      const daysSince = (Date.now() - verificationDate.getTime()) / (1000 * 60 * 60 * 24)
+      
+      if (daysSince > daysUntilReVerify) {
+        // Re-verify after X days
+        localStorage.removeItem('age_verification')
+        return false
+      }
+
+      return true
+    } catch {
+      return false
+    }
+  }, [daysUntilReVerify])
 
   // ✅ Initialize
   useEffect(() => {
-    setIsMounted(true)
+    // Only run once
+    if (isInitialized.current) return
+    isInitialized.current = true
+
+    // Check if already verified
+    const verified = checkVerification()
     
-    // Check if user is already verified
-    const verified = localStorage.getItem('age_verified')
-    const verificationDate = localStorage.getItem('age_verification_date')
-    
-    if (verified === 'true') {
-      // Check if verification is still valid (optional: re-verify after 30 days)
-      if (verificationDate) {
-        const date = new Date(verificationDate)
-        const daysSinceVerification = (Date.now() - date.getTime()) / (1000 * 60 * 60 * 24)
-        if (daysSinceVerification < 30) {
-          setIsVerified(true)
-          setShowModal(false)
-          return
-        }
-      } else {
-        setIsVerified(true)
-        setShowModal(false)
-        return
-      }
+    if (verified) {
+      setIsVerified(true)
+      setShowModal(false)
+      document.body.style.overflow = 'unset'
+      setIsLoading(false)
+      return
     }
 
-    // Show verification modal
+    // Show modal
     setShowModal(true)
+    setCurrentStep('welcome')
     document.body.style.overflow = 'hidden'
-    generateNewQuestion()
-    
+    setCurrentQuestion(generateQuestion())
+    setIsLoading(false)
+
     return () => {
       document.body.style.overflow = 'unset'
     }
-  }, [generateNewQuestion])
+  }, [checkVerification, generateQuestion])
 
-  // ✅ Don't render until mounted
-  if (!isMounted) {
-    return null
-  }
+  // ✅ Handle modal close (prevent closing without verification)
+  const handleCloseAttempt = useCallback(() => {
+    toast.warning('Please verify your age to continue')
+  }, [])
 
-  // ✅ If verified, render nothing
-  if (isVerified) {
-    return null
-  }
+  // ✅ Handle success animation
+  useEffect(() => {
+    if (currentStep === 'success') {
+      const timer = setTimeout(() => {
+        setShowModal(false)
+        document.body.style.overflow = 'unset'
+      }, 3000)
+      return () => clearTimeout(timer)
+    }
+  }, [currentStep])
+
+  // ✅ Don't render if verified
+  if (isVerified) return null
 
   return (
     <AnimatePresence>
       {showModal && (
-        <div className={cn("fixed inset-0 z-[9999] flex items-center justify-center p-4", className)}>
+        <div className={cn("fixed inset-0 z-[9999] flex items-center justify-center p-2 sm:p-4", className)}>
           {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/90 backdrop-blur-md"
+            onClick={handleCloseAttempt}
           />
 
           {/* Modal */}
           <motion.div
+            ref={modalRef}
             initial={{ scale: 0.9, opacity: 0, y: 20 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.9, opacity: 0, y: 20 }}
-            className="relative w-full max-w-lg bg-white dark:bg-gray-900 rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto"
+            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+            className="relative w-full max-w-md bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 rounded-3xl shadow-2xl overflow-hidden max-h-[95vh] overflow-y-auto border border-gray-700/50"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Header */}
-            <div className="relative h-48 bg-gradient-to-br from-pink-600 via-purple-600 to-indigo-600 flex items-center justify-center">
-              <div className="absolute inset-0 bg-black/20" />
-              <div className="relative text-center">
-                <div className="w-24 h-24 mx-auto bg-white/20 backdrop-blur rounded-full flex items-center justify-center mb-3">
-                  <Shield className="h-12 w-12 text-white" />
-                </div>
-                <h2 className="text-2xl font-bold text-white">Age Verification</h2>
-                <p className="text-white/80 text-sm">Please confirm you are 18 or older</p>
-              </div>
-            </div>
+            {/* Decorative Background Elements */}
+            <div className="absolute -top-24 -right-24 w-64 h-64 bg-pink-600/10 rounded-full blur-3xl" />
+            <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-purple-600/10 rounded-full blur-3xl" />
 
             {/* Content */}
-            <div className="p-6">
-              {!isUnderage ? (
+            <div className="relative p-6 sm:p-8">
+              {/* Loading State */}
+              {isLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="w-12 h-12 border-4 border-pink-600 border-t-transparent rounded-full animate-spin" />
+                </div>
+              ) : (
                 <>
-                  {/* Verification Method Tabs */}
-                  <div className="flex gap-2 mb-4 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
-                    <button
-                      onClick={() => setVerificationMethod('date')}
-                      className={cn(
-                        "flex-1 px-3 py-2 text-sm rounded-md transition-colors",
-                        verificationMethod === 'date' 
-                          ? "bg-pink-600 text-white" 
-                          : "hover:bg-gray-200 dark:hover:bg-gray-700"
-                      )}
-                    >
-                      <Calendar className="h-4 w-4 inline mr-1" />
-                      Birth Date
-                    </button>
-                  </div>
-
-                  {/* Question Method */}
-                  {verificationMethod === 'question' && currentQuestion && (
+                  {/* Welcome Step */}
+                  {currentStep === 'welcome' && (
                     <motion.div
-                      key={currentQuestion.id}
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className="space-y-4"
+                      className="space-y-6"
                     >
-                      <div className="text-center mb-4">
-                        <div className="inline-flex items-center gap-2 bg-pink-100 dark:bg-pink-900/30 text-pink-600 dark:text-pink-400 px-3 py-1 rounded-full text-sm font-medium">
+                      <div className="text-center">
+                        <div className="w-20 h-20 mx-auto bg-gradient-to-br from-pink-600 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg shadow-pink-600/20">
+                          <Shield className="h-10 w-10 text-white" />
+                        </div>
+                        <h2 className="mt-4 text-2xl font-bold text-white">Age Verification</h2>
+                        <p className="mt-2 text-gray-400 text-sm">
+                          Please confirm you are 18 or older to access Mystic Wines
+                        </p>
+                      </div>
+
+                      <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700/50">
+                        <div className="flex items-start gap-3 text-sm">
+                          <div className="w-8 h-8 rounded-full bg-green-500/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <Check className="h-4 w-4 text-green-400" />
+                          </div>
+                          <div>
+                            <p className="text-gray-300 font-medium">Why we verify?</p>
+                            <p className="text-gray-400 text-xs">
+                              We're committed to responsible drinking and comply with legal age requirements.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <button
+                          onClick={() => setCurrentStep('date')}
+                          className="w-full flex items-center justify-between bg-pink-600 hover:bg-pink-700 text-white rounded-xl px-4 py-3 transition-colors group"
+                        >
+                          <div className="flex items-center gap-3">
+                            <Calendar className="h-5 w-5" />
+                            <span className="font-medium">Enter Birth Date</span>
+                          </div>
+                          <ChevronRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            setCurrentStep('question')
+                            setCurrentQuestion(generateQuestion())
+                          }}
+                          className="w-full flex items-center justify-between bg-gray-800 hover:bg-gray-700 text-white rounded-xl px-4 py-3 transition-colors group border border-gray-700"
+                        >
+                          <div className="flex items-center gap-3">
+                            <Brain className="h-5 w-5 text-purple-400" />
+                            <span className="font-medium">Answer a Question</span>
+                          </div>
+                          <ChevronRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
+                        </button>
+                      </div>
+
+                      <div className="text-center">
+                        <p className="text-xs text-gray-500">
+                          By continuing, you agree to our{' '}
+                          <Link href="/terms" className="text-pink-400 hover:underline">
+                            Terms
+                          </Link>
+                          {' '}&{' '}
+                          <Link href="/privacy" className="text-pink-400 hover:underline">
+                            Privacy Policy
+                          </Link>
+                        </p>
+                      </div>
+                    </motion.div>
+                  )}
+
+                  {/* Date Verification Step */}
+                  {currentStep === 'date' && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="space-y-6"
+                    >
+                      <div className="text-center">
+                        <div className="inline-flex items-center gap-2 bg-blue-500/10 text-blue-400 px-3 py-1 rounded-full text-sm">
+                          <Calendar className="h-4 w-4" />
+                          Enter Your Birth Date
+                        </div>
+                        <p className="mt-2 text-gray-400 text-sm">
+                          Please enter your date of birth to verify your age
+                        </p>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2">
+                        <div>
+                          <label className="block text-xs text-gray-400 mb-1">Month</label>
+                          <select
+                            value={birthMonth}
+                            onChange={(e) => setBirthMonth(e.target.value)}
+                            className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                          >
+                            <option value="">MM</option>
+                            {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
+                              <option key={m} value={m.toString().padStart(2, '0')}>
+                                {m.toString().padStart(2, '0')}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-400 mb-1">Day</label>
+                          <select
+                            value={birthDay}
+                            onChange={(e) => setBirthDay(e.target.value)}
+                            className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                          >
+                            <option value="">DD</option>
+                            {Array.from({ length: 31 }, (_, i) => i + 1).map(d => (
+                              <option key={d} value={d.toString().padStart(2, '0')}>
+                                {d.toString().padStart(2, '0')}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-400 mb-1">Year</label>
+                          <select
+                            value={birthYear}
+                            onChange={(e) => setBirthYear(e.target.value)}
+                            className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                          >
+                            <option value="">YYYY</option>
+                            {Array.from({ length: 100 }, (_, i) => new Date().getFullYear() - i).map(y => (
+                              <option key={y} value={y}>
+                                {y}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+
+                      {error && (
+                        <motion.p
+                          initial={{ opacity: 0, y: -10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="text-red-400 text-sm text-center bg-red-500/10 rounded-lg p-2"
+                        >
+                          {error}
+                        </motion.p>
+                      )}
+
+                      <div className="flex gap-3">
+                        <Button
+                          onClick={verifyByDate}
+                          className="flex-1 bg-pink-600 hover:bg-pink-700 text-white"
+                        >
+                          <Check className="mr-2 h-4 w-4" />
+                          Verify Age
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            setCurrentStep('welcome')
+                            setError('')
+                          }}
+                          className="border-gray-700 text-gray-400 hover:bg-gray-800"
+                        >
+                          Back
+                        </Button>
+                      </div>
+                    </motion.div>
+                  )}
+
+                  {/* Question Verification Step */}
+                  {currentStep === 'question' && currentQuestion && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="space-y-6"
+                    >
+                      <div className="text-center">
+                        <div className="inline-flex items-center gap-2 bg-purple-500/10 text-purple-400 px-3 py-1 rounded-full text-sm">
                           <Brain className="h-4 w-4" />
                           Quick Question
                         </div>
-                        <p className="mt-2 text-sm text-gray-500">
+                        <p className="mt-2 text-gray-400 text-sm">
                           Answer correctly to verify your age
-                          {score > 0 && ` (${score} correct)`}
                         </p>
                       </div>
 
-                      <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-6 text-center">
-                        <div className="text-4xl mb-3">🤔</div>
-                        <p className="text-lg font-medium text-gray-900 dark:text-white">
+                      <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700/50">
+                        <div className="text-4xl mb-3 text-center">🤔</div>
+                        <p className="text-lg font-medium text-white text-center">
                           {currentQuestion.text}
                         </p>
+                        <div className="mt-3 flex justify-center gap-2">
+                          <span className="text-xs px-2 py-1 bg-gray-700 rounded-full text-gray-400">
+                            {currentQuestion.difficulty}
+                          </span>
+                        </div>
                       </div>
 
-                      {/* Hint */}
-                      <div className="text-center">
+                      {showHint && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="bg-gray-800/50 rounded-lg p-3 border border-gray-700/50 text-sm text-gray-300"
+                        >
+                          💡 {currentQuestion.hint}
+                        </motion.div>
+                      )}
+
+                      <div className="flex flex-wrap gap-2 justify-center">
                         <button
                           onClick={() => setShowHint(!showHint)}
-                          className="text-sm text-pink-600 hover:text-pink-700 hover:underline"
+                          className="text-xs text-gray-400 hover:text-gray-300 transition"
                         >
                           {showHint ? 'Hide hint' : 'Show hint'}
                         </button>
-                        {showHint && (
-                          <motion.p
-                            initial={{ opacity: 0, y: -10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            className="mt-2 text-sm text-gray-500 bg-gray-50 dark:bg-gray-800 p-2 rounded-lg"
-                          >
-                            💡 {currentQuestion.hint}
-                          </motion.p>
-                        )}
                       </div>
 
-                      {/* Answer Buttons */}
+                      {error && (
+                        <motion.p
+                          initial={{ opacity: 0, y: -10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="text-red-400 text-sm text-center bg-red-500/10 rounded-lg p-2"
+                        >
+                          {error}
+                        </motion.p>
+                      )}
+
                       <div className="grid grid-cols-2 gap-3">
                         <Button
-                          onClick={() => handleAnswer('yes')}
-                          className="bg-pink-600 hover:bg-pink-700 text-white"
+                          onClick={() => verifyByQuestion('yes')}
+                          className="bg-green-600 hover:bg-green-700 text-white"
                         >
                           <Check className="mr-2 h-4 w-4" />
                           Yes
                         </Button>
                         <Button
-                          onClick={() => handleAnswer('no')}
+                          onClick={() => verifyByQuestion('no')}
                           variant="outline"
-                          className="border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800"
+                          className="border-gray-700 hover:bg-gray-800"
                         >
                           <X className="mr-2 h-4 w-4" />
                           No
@@ -365,121 +572,82 @@ export default function AgeVerification({ className = '' }: AgeVerificationProps
 
                       <div className="text-center">
                         <button
-                          onClick={generateNewQuestion}
-                          className="text-sm text-gray-400 hover:text-gray-600 transition"
+                          onClick={() => {
+                            setCurrentStep('welcome')
+                            setError('')
+                          }}
+                          className="text-xs text-gray-400 hover:text-gray-300 transition"
                         >
-                          <Sparkles className="inline h-3 w-3 mr-1" />
-                          New question
+                          ← Back to options
                         </button>
                       </div>
                     </motion.div>
                   )}
 
-                  {/* Date Method */}
-                  {verificationMethod === 'date' && (
+                  {/* Success Step */}
+                  {currentStep === 'success' && (
                     <motion.div
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="space-y-4"
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="text-center py-8"
                     >
-                      <div className="text-center mb-4">
-                        <div className="inline-flex items-center gap-2 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-3 py-1 rounded-full text-sm font-medium">
-                          <Calendar className="h-4 w-4" />
-                          Enter Your Birth Date
-                        </div>
-                        <p className="mt-2 text-sm text-gray-500">
-                          Please enter your date of birth to verify you are 18+
-                        </p>
+                      <div className="w-24 h-24 mx-auto bg-gradient-to-br from-green-500 to-emerald-500 rounded-full flex items-center justify-center shadow-lg shadow-green-500/20">
+                        <PartyPopper className="h-12 w-12 text-white" />
                       </div>
-
-                      <div className="space-y-3">
-                        <input
-                          type="date"
-                          max={new Date(new Date().setFullYear(new Date().getFullYear() - 18)).toISOString().split('T')[0]}
-                          className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-                          onChange={(e) => {
-                            if (e.target.value) {
-                              setSelectedDate(new Date(e.target.value))
-                            }
-                          }}
-                        />
-                        
-                        {selectedDate && (
-                          <div className="text-sm text-gray-500">
-                            {isLegalAge(selectedDate) ? (
-                              <span className="text-green-600">✓ You are 18 or older</span>
-                            ) : (
-                              <span className="text-red-600">✗ You must be 18 or older</span>
-                            )}
-                          </div>
-                        )}
-
-                        <Button
-                          onClick={handleDateVerification}
-                          disabled={!selectedDate || !isLegalAge(selectedDate!)}
-                          className="w-full bg-pink-600 hover:bg-pink-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          Verify Age
-                        </Button>
-                      </div>
+                      <h3 className="mt-4 text-2xl font-bold text-white">
+                        Welcome to Mystic Wines! 🍷
+                      </h3>
+                      <p className="mt-2 text-gray-400">
+                        You've been verified as 18+. Enjoy exploring our collection.
+                      </p>
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
+                        className="mt-4 inline-block"
+                      >
+                        <Wine className="h-8 w-8 text-pink-400" />
+                      </motion.div>
                     </motion.div>
                   )}
 
-                  {/* Terms */}
-                  <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700 text-center">
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      By continuing, you agree to our{' '}
-                      <Link href="/terms" className="text-pink-600 hover:underline">
-                        Terms & Conditions
-                      </Link>
-                      {' '}and{' '}
-                      <Link href="/privacy" className="text-pink-600 hover:underline">
-                        Privacy Policy
-                      </Link>
-                    </p>
-                  </div>
-                </>
-              ) : (
-                /* Underage Message */
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="text-center py-4"
-                >
-                  <div className="text-8xl mb-4">🔞</div>
-                  <h3 className="text-2xl font-bold text-amber-800 dark:text-amber-400 mb-2">
-                    Access Denied
-                  </h3>
-                  <p className="text-gray-600 dark:text-gray-400 mb-2">
-                    {attemptCount > 2 
-                      ? `You must be at least 18 years old to access this site. We've detected ${attemptCount} failed attempts.`
-                      : "You need to be 18 or older to enter."}
-                  </p>
-                  <div className="w-24 h-1 bg-gradient-to-r from-pink-600 to-purple-600 mx-auto rounded-full" />
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-4">
-                    Mystic Wines is committed to responsible drinking.
-                  </p>
-                  <Button
-                    onClick={handleReset}
-                    variant="outline"
-                    className="mt-4"
-                  >
-                    Try Again
-                  </Button>
-                  {attemptCount > 3 && (
-                    <p className="text-xs text-red-500 mt-2">
-                      Multiple failed attempts detected. Please ensure you are 18+.
-                    </p>
+                  {/* Denied Step */}
+                  {currentStep === 'denied' && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="text-center py-8"
+                    >
+                      <div className="w-24 h-24 mx-auto bg-gradient-to-br from-red-500 to-rose-500 rounded-full flex items-center justify-center shadow-lg shadow-red-500/20">
+                        <Lock className="h-12 w-12 text-white" />
+                      </div>
+                      <h3 className="mt-4 text-2xl font-bold text-red-400">
+                        Access Denied
+                      </h3>
+                      <p className="mt-2 text-gray-400">
+                        You must be at least 18 years old to access this site.
+                      </p>
+                      <div className="mt-6 p-4 bg-gray-800/50 rounded-xl border border-gray-700/50">
+                        <p className="text-sm text-gray-300">
+                          🍷 Please drink responsibly. Alcohol is not for sale to persons under 18 years.
+                        </p>
+                      </div>
+                      <Button
+                        onClick={() => {
+                          setCurrentStep('welcome')
+                          setAttemptCount(0)
+                          setError('')
+                          setBirthYear('')
+                          setBirthMonth('')
+                          setBirthDay('')
+                        }}
+                        className="mt-4 bg-pink-600 hover:bg-pink-700 text-white"
+                      >
+                        Try Again
+                      </Button>
+                    </motion.div>
                   )}
-                </motion.div>
+                </>
               )}
-
-              {/* Drink Responsibly Message */}
-              <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 text-center">
-                <p className="text-xs text-gray-400 dark:text-gray-500">
-                  🍷 Please drink responsibly. Alcohol is not for sale to persons under 18 years.
-                </p>
-              </div>
             </div>
           </motion.div>
         </div>
