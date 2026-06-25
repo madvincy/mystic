@@ -87,7 +87,7 @@ const otherCategories = [
 ];
 
 export default function Header() {
-  // ✅ ALL HOOKS AT THE TOP - in the same order every render
+  // ✅ ALL HOOKS AT THE TOP
   const pathname = usePathname();
   const router = useRouter();
   const dispatch = useDispatch<AppDispatch>();
@@ -95,7 +95,6 @@ export default function Header() {
   const { itemCount } = useSelector((state: RootState) => state.cart);
   const { isCartOpen } = useSelector((state: RootState) => state.ui);
 
-  // ✅ Use auth context instead of direct supabase calls
   const { user, isAdmin, loading: authLoading, signOut } = useSupabaseAuth();
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -201,7 +200,6 @@ export default function Header() {
     );
   };
 
-  // ✅ Get category slug for main category links
   const getCategorySlug = (categoryName: string) => {
     const categoryMap = {
       Wine: "wine",
@@ -535,9 +533,9 @@ export default function Header() {
               })}
             </nav>
 
-            {/* Actions */}
+            {/* ✅ Actions - Desktop & Mobile */}
             <div className="flex items-center gap-2 md:gap-4">
-              {/* Search - Desktop */}
+              {/* Search - Desktop only */}
               <form
                 onSubmit={handleSearch}
                 className="hidden md:block relative"
@@ -552,11 +550,13 @@ export default function Header() {
                 />
               </form>
 
-              {/* Theme Toggle */}
-              {mounted && <ThemeToggle />}
+              {/* ✅ Theme Toggle - Hidden on mobile (already in mobile menu) */}
+              <div className="hidden md:block">
+                {mounted && <ThemeToggle />}
+              </div>
 
-              {/* User */}
-              <div className="relative group">
+              {/* ✅ User - Hidden on mobile (already in mobile menu) */}
+              <div className="hidden md:block relative group">
                 <Link href={user ? "/profile" : "/auth/login"}>
                   <Button
                     variant="ghost"
@@ -613,19 +613,21 @@ export default function Header() {
                 )}
               </div>
 
-              {/* Wishlist */}
-              <Link href="/wishlist">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="rounded-full relative"
-                >
-                  <Heart className="h-5 w-5" />
-                </Button>
-              </Link>
+              {/* ✅ Wishlist - Hidden on mobile (already in mobile menu) */}
+              <div className="hidden md:block">
+                <Link href="/wishlist">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="rounded-full relative"
+                  >
+                    <Heart className="h-5 w-5" />
+                  </Button>
+                </Link>
+              </div>
 
-              {/* Cart */}
-              <Button
+              {/* ✅ Cart - Visible on all screen sizes */}
+              {/* <Button
                 variant="ghost"
                 size="icon"
                 className="rounded-full relative"
@@ -641,9 +643,9 @@ export default function Header() {
                     {itemCount}
                   </motion.span>
                 )}
-              </Button>
+              </Button> */}
 
-              {/* Mobile Menu Toggle */}
+              {/* ✅ Mobile Menu Toggle - Only visible on mobile */}
               <Button
                 variant="ghost"
                 size="icon"
@@ -651,7 +653,8 @@ export default function Header() {
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               >
                 {isMobileMenuOpen ? (
-                  <X className="h-5 w-5" />
+                  // <X className="h-5 w-5" />
+                  <div></div>
                 ) : (
                   <Menu className="h-5 w-5" />
                 )}

@@ -10,9 +10,15 @@ const nextConfig: NextConfig = {
         port: '',
         pathname: '/**', // This wildcard allows all paths
       },
-       {
+      {
         protocol: 'https',
         hostname: 'images.pexels.com',
+        port: '',
+        pathname: '/**', // This wildcard allows all paths
+      },
+      {
+        protocol: 'https',
+        hostname: 'bzddafwsosjzqkrbbpjj.supabase.co',
         port: '',
         pathname: '/**', // This wildcard allows all paths
       },

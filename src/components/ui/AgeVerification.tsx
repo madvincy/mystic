@@ -286,18 +286,6 @@ export default function AgeVerification({ className = '' }: AgeVerificationProps
                   {/* Verification Method Tabs */}
                   <div className="flex gap-2 mb-4 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
                     <button
-                      onClick={() => setVerificationMethod('question')}
-                      className={cn(
-                        "flex-1 px-3 py-2 text-sm rounded-md transition-colors",
-                        verificationMethod === 'question' 
-                          ? "bg-pink-600 text-white" 
-                          : "hover:bg-gray-200 dark:hover:bg-gray-700"
-                      )}
-                    >
-                      <Brain className="h-4 w-4 inline mr-1" />
-                      Question
-                    </button>
-                    <button
                       onClick={() => setVerificationMethod('date')}
                       className={cn(
                         "flex-1 px-3 py-2 text-sm rounded-md transition-colors",

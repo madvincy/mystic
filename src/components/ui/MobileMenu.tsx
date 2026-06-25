@@ -4,6 +4,8 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
+import { useSelector } from 'react-redux'
+import { RootState } from '@/lib/store'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   X, 
@@ -23,11 +25,16 @@ import {
   Sparkles,
   Gift,
   Newspaper,
-  Phone
+  Phone,
+  Sun,
+  Moon,
+  ShoppingCart,
+  Menu
 } from 'lucide-react'
 import { Button } from '@/components/shadCn/ui/button'
 import { cn } from '@/lib/utils'
-import { supabase } from '@/lib/supabase/client'
+import { useTheme } from 'next-themes'
+import { useSupabaseAuth } from '@/providers/SupabaseAuthProvider'
 
 interface MobileMenuProps {
   isOpen: boolean
@@ -83,33 +90,19 @@ const otherCategories = [
 
 export default function MobileMenu({ isOpen, onClose, className = '' }: MobileMenuProps) {
   const router = useRouter()
-  const [user, setUser] = useState<any>(null)
-  const [isAdmin, setIsAdmin] = useState(false)
+  const { theme, setTheme } = useTheme()
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set())
   const [showMore, setShowMore] = useState(false)
+  const [mounted, setMounted] = useState(false)
+  
+  // ✅ Use SupabaseAuthProvider
+  const { user, isAdmin, signOut } = useSupabaseAuth()
+  
+  // Get cart count from Redux
+  const { itemCount } = useSelector((state: RootState) => state.cart)
 
-  // Check auth status
   useEffect(() => {
-    const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      setUser(user)
-      
-      if (user) {
-        const { data } = await supabase
-          .from('users')
-          .select('is_admin')
-          .eq('id', user.id)
-          .single()
-        setIsAdmin(data?.is_admin || false)
-      }
-    }
-    getUser()
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setUser(session?.user || null)
-    })
-
-    return () => subscription.unsubscribe()
+    setMounted(true)
   }, [])
 
   const toggleCategory = (categoryName: string) => {
@@ -125,13 +118,16 @@ export default function MobileMenu({ isOpen, onClose, className = '' }: MobileMe
   }
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut()
-    setUser(null)
-    setIsAdmin(false)
-    onClose()
-    router.push('/')
+    try {
+      await signOut()
+      onClose()
+      router.push('/')
+    } catch (error) {
+      console.error('Sign out error:', error)
+    }
   }
 
+  // Main navigation items
   const navigation = [
     { name: 'Home', href: '/', icon: Home },
     { name: 'All Products', href: '/products', icon: ShoppingBag },
@@ -145,7 +141,6 @@ export default function MobileMenu({ isOpen, onClose, className = '' }: MobileMe
     { name: 'Profile', href: '/profile', icon: User },
     { name: 'Orders', href: '/orders', icon: Package },
     { name: 'Wishlist', href: '/wishlist', icon: Heart },
-    { name: 'Settings', href: '/settings', icon: Settings },
   ]
 
   return (
@@ -173,7 +168,7 @@ export default function MobileMenu({ isOpen, onClose, className = '' }: MobileMe
             )}
           >
             <div className="p-4 pb-20">
-              {/* Header */}
+              {/* Header with Cart and Menu Toggle */}
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-2">
                   <div className="w-8 h-8 rounded-full bg-gradient-to-r from-pink-600 to-purple-600 flex items-center justify-center text-white font-bold text-sm">
@@ -183,9 +178,23 @@ export default function MobileMenu({ isOpen, onClose, className = '' }: MobileMe
                     MysticWines
                   </span>
                 </div>
-                <Button variant="ghost" size="icon" onClick={onClose}>
-                  <X className="h-5 w-5" />
-                </Button>
+                <div className="flex items-center gap-1">
+                  {/* ✅ Cart Button - Visible on mobile */}
+                  <Link href="/cart" onClick={onClose} className="relative">
+                    <Button variant="ghost" size="icon" className="rounded-full relative">
+                      <ShoppingCart className="h-5 w-5" />
+                      {itemCount > 0 && (
+                        <span className="absolute -top-1 -right-1 h-5 w-5 bg-pink-600 text-white text-xs rounded-full flex items-center justify-center">
+                          {itemCount > 99 ? '99+' : itemCount}
+                        </span>
+                      )}
+                    </Button>
+                  </Link>
+                  {/* ✅ Close Button - Mobile menu toggle */}
+                  <Button variant="ghost" size="icon" onClick={onClose}>
+                    <X className="h-5 w-5" />
+                  </Button>
+                </div>
               </div>
 
               {/* User Info */}
@@ -225,8 +234,15 @@ export default function MobileMenu({ isOpen, onClose, className = '' }: MobileMe
                 })}
               </nav>
 
-              {/* Category Accordion: Wine */}
+              {/* Categories Section */}
               <div className="border-t border-gray-200 dark:border-gray-700 pt-2">
+                <p className="px-3 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                  Categories
+                </p>
+              </div>
+
+              {/* Category Accordion: Wine */}
+              <div>
                 <button
                   onClick={() => toggleCategory('Wine')}
                   className="flex items-center justify-between w-full px-3 py-2.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-sm"
