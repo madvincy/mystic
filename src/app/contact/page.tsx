@@ -8,32 +8,81 @@ import { Input } from '@/components/shadCn/ui/input'
 import { Textarea } from '@/components/shadCn/ui/textarea'
 import { Label } from '@/components/shadCn/ui/label'
 import { Card, CardContent } from '@/components/shadCn/ui/card'
-import { MapPin, Phone, Mail, Clock, Send, Facebook, Twitter, Instagram, Youtube } from 'lucide-react'
+import { 
+  MapPin, 
+  Phone, 
+  Mail, 
+  Clock, 
+  Send, 
+  Facebook, 
+  Twitter, 
+  Instagram, 
+  Youtube,
+  CheckCircle,
+  AlertCircle,
+  Loader2
+} from 'lucide-react'
 import { toast } from 'sonner'
+import { supabase } from '@/lib/supabase/client'
 
 export default function ContactPage() {
   const [isLoading, setIsLoading] = useState(false)
+  const [isSuccess, setIsSuccess] = useState(false)
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     subject: '',
     message: '',
+    // ✅ Honeypot field - hidden from real users
+    honeypot: '',
   })
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
+    setIsSuccess(false)
 
     try {
-      // Send to WhatsApp or email
-      const message = `Contact Form:\n\nName: ${formData.name}\nEmail: ${formData.email}\nSubject: ${formData.subject}\nMessage: ${formData.message}`
-      const whatsappUrl = `https://wa.me/254710835445?text=${encodeURIComponent(message)}`
-      window.open(whatsappUrl, '_blank')
+      // Send to API route
+      const response = await fetch('/api/contact', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to send message')
+      }
+
+      // ✅ Save to Supabase for tracking (optional)
+      await supabase
+        .from('contact_messages')
+        .insert({
+          name: formData.name,
+          email: formData.email,
+          subject: formData.subject,
+          message: formData.message,
+          status: 'new',
+          created_at: new Date().toISOString(),
+        })
+        .then(({ error }) => {
+          if (error) console.error('Error saving contact:', error)
+        })
+
+      setIsSuccess(true)
+      toast.success('Message sent successfully! We\'ll get back to you soon.')
+      setFormData({ name: '', email: '', subject: '', message: '', honeypot: '' })
       
-      toast.success('Message sent! We\'ll get back to you soon.')
-      setFormData({ name: '', email: '', subject: '', message: '' })
-    } catch (error) {
-      toast.error('Failed to send message. Please try again.')
+      // Reset success after 5 seconds
+      setTimeout(() => setIsSuccess(false), 5000)
+
+    } catch (error: any) {
+      console.error('Contact error:', error)
+      toast.error(error.message || 'Failed to send message. Please try again.')
     } finally {
       setIsLoading(false)
     }
@@ -46,12 +95,48 @@ export default function ContactPage() {
     { icon: Clock, label: 'Hours', value: 'Mon-Sat: 9AM - 8PM' },
   ]
 
+  // ✅ Fixed social links
   const socialLinks = [
-    { icon: Facebook, href: 'https://facebook.com/mysticwines', label: 'Facebook' },
-    { icon: Twitter, href: 'https://twitter.com/mysticwines', label: 'Twitter' },
-    { icon: Instagram, href: 'https://instagram.com/mysticwines', label: 'Instagram' },
-    { icon: Youtube, href: 'https://youtube.com/mysticwines', label: 'YouTube' },
+    { 
+      icon: Facebook, 
+      href: 'https://facebook.com/mysticwines', 
+      label: 'Facebook',
+      color: 'hover:bg-[#1877f2] hover:text-white'
+    },
+    { 
+      icon: Twitter, 
+      href: 'https://twitter.com/mysticwines', 
+      label: 'Twitter',
+      color: 'hover:bg-[#1da1f2] hover:text-white'
+    },
+    { 
+      icon: Instagram, 
+      href: 'https://instagram.com/mysticwines', 
+      label: 'Instagram',
+      color: 'hover:bg-gradient-to-br hover:from-[#f09433] hover:via-[#e6683c] hover:to-[#dc2743] hover:text-white'
+    },
+    { 
+      icon: Youtube, 
+      href: 'https://youtube.com/mysticwines', 
+      label: 'YouTube',
+      color: 'hover:bg-[#ff0000] hover:text-white'
+    },
   ]
+
+  // ✅ Fetch social links from database (optional)
+  const [socialLinksFromDb, setSocialLinksFromDb] = useState<any[]>([])
+  
+  // Uncomment to fetch from database
+  // useEffect(() => {
+  //   const fetchSocialLinks = async () => {
+  //     const { data } = await supabase
+  //       .from('social_links')
+  //       .select('*')
+  //       .eq('is_active', true)
+  //     if (data) setSocialLinksFromDb(data)
+  //   }
+  //   fetchSocialLinks()
+  // }, [])
 
   return (
     <div className="container mx-auto px-4 py-12">
@@ -111,10 +196,10 @@ export default function ContactPage() {
                         href={social.href}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-pink-100 dark:hover:bg-pink-900/30 transition-colors"
+                        className={`p-2 bg-gray-100 dark:bg-gray-800 rounded-lg transition-all duration-300 ${social.color}`}
                         aria-label={social.label}
                       >
-                        <Icon className="h-5 w-5 text-gray-600 dark:text-gray-400 hover:text-pink-600 transition-colors" />
+                        <Icon className="h-5 w-5 text-gray-600 dark:text-gray-400 group-hover:text-white transition-colors" />
                       </a>
                     )
                   })}
@@ -129,6 +214,20 @@ export default function ContactPage() {
               <CardContent className="p-6">
                 <h2 className="text-xl font-semibold mb-4">Send a Message</h2>
                 <form onSubmit={handleSubmit} className="space-y-4">
+                  {/* ✅ Honeypot field - hidden from real users */}
+                  <div className="hidden">
+                    <Label htmlFor="honeypot">Leave this empty</Label>
+                    <Input
+                      id="honeypot"
+                      name="honeypot"
+                      value={formData.honeypot}
+                      onChange={(e) => setFormData({ ...formData, honeypot: e.target.value })}
+                      tabIndex={-1}
+                      autoComplete="off"
+                    />
+                    <p className="text-xs text-gray-400">This field is for spam prevention</p>
+                  </div>
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="name">Your Name *</Label>
@@ -137,7 +236,8 @@ export default function ContactPage() {
                         value={formData.name}
                         onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                         required
-                        disabled={isLoading}
+                        disabled={isLoading || isSuccess}
+                        placeholder="John Doe"
                       />
                     </div>
                     <div className="space-y-2">
@@ -148,7 +248,8 @@ export default function ContactPage() {
                         value={formData.email}
                         onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                         required
-                        disabled={isLoading}
+                        disabled={isLoading || isSuccess}
+                        placeholder="john@example.com"
                       />
                     </div>
                   </div>
@@ -160,7 +261,8 @@ export default function ContactPage() {
                       value={formData.subject}
                       onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
                       required
-                      disabled={isLoading}
+                      disabled={isLoading || isSuccess}
+                      placeholder="Order inquiry"
                     />
                   </div>
 
@@ -172,22 +274,43 @@ export default function ContactPage() {
                       value={formData.message}
                       onChange={(e) => setFormData({ ...formData, message: e.target.value })}
                       required
-                      disabled={isLoading}
+                      disabled={isLoading || isSuccess}
+                      placeholder="Your message here..."
                     />
                   </div>
 
                   <Button
                     type="submit"
-                    className="w-full bg-pink-600 hover:bg-pink-700 text-white"
-                    disabled={isLoading}
+                    className={`w-full text-white transition-all ${
+                      isSuccess 
+                        ? 'bg-green-600 hover:bg-green-700' 
+                        : 'bg-pink-600 hover:bg-pink-700'
+                    }`}
+                    disabled={isLoading || isSuccess}
                   >
-                    {isLoading ? 'Sending...' : (
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Sending...
+                      </>
+                    ) : isSuccess ? (
+                      <>
+                        <CheckCircle className="mr-2 h-4 w-4" />
+                        Sent Successfully!
+                      </>
+                    ) : (
                       <>
                         Send Message
                         <Send className="ml-2 h-4 w-4" />
                       </>
                     )}
                   </Button>
+
+                  {isSuccess && (
+                    <p className="text-sm text-green-600 dark:text-green-400 text-center">
+                      ✓ Your message has been sent. We'll respond within 24 hours.
+                    </p>
+                  )}
                 </form>
               </CardContent>
             </Card>

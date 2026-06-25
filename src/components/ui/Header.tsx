@@ -250,10 +250,10 @@ export default function Header() {
             <Link href="/" className="flex items-center gap-3 shrink-0 group">
               <div className="relative w-10 h-10 rounded-full overflow-hidden bg-gradient-to-r from-pink-600 to-purple-600 flex items-center justify-center">
                 <Image
-                  src="/images/logos/logo.png"
+                  src="/images/logos/main-logo.png"
                   alt="Mystic Wines"
-                  width={40}
-                  height={40}
+                  width={60}
+                  height={60}
                   className="object-cover"
                   priority
                 />

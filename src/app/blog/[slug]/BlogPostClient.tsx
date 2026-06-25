@@ -1,8 +1,7 @@
 // src/app/blog/[slug]/BlogPostClient.tsx
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { motion } from 'framer-motion'
@@ -30,75 +29,47 @@ interface BlogPost {
 }
 
 interface BlogPostClientProps {
-  initialPost: BlogPost | null
+  initialPost: BlogPost
 }
 
 export default function BlogPostClient({ initialPost }: BlogPostClientProps) {
-  const router = useRouter()
-  const [post, setPost] = useState<BlogPost | null>(initialPost)
+  const [post] = useState<BlogPost>(initialPost)
   const [relatedPosts, setRelatedPosts] = useState<BlogPost[]>([])
   const [liked, setLiked] = useState(false)
   const [bookmarked, setBookmarked] = useState(false)
   const [viewCounted, setViewCounted] = useState(false)
-  const [loading, setLoading] = useState(false)
 
-  // ✅ If no post, show not found
-  if (!post) {
-    return (
-      <div className="container mx-auto px-4 py-12 text-center">
-        <div className="text-6xl mb-4">🔍</div>
-        <h2 className="text-2xl font-bold mb-2">Post not found</h2>
-        <p className="text-gray-500 mb-6">The article you're looking for doesn't exist.</p>
-        <Link href="/blog">
-          <Button>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Blog
-          </Button>
-        </Link>
-      </div>
-    )
-  }
-
-  // ✅ Fetch related posts and update view count
+  // Fetch related posts and update view count
   useEffect(() => {
     const fetchRelatedAndUpdateViews = async () => {
-      setLoading(true)
-      try {
-        // Update view count (non-blocking)
-        if (!viewCounted && post) {
-          setViewCounted(true)
-          await supabase
-            .from('blog_posts')
-            .update({ views: (post.views || 0) + 1 })
-            .eq('id', post.id)
-            .then(({ error }) => {
-              if (error) console.error('Error updating view count:', error)
-            })
-        }
+      // Update view count (non-blocking)
+      if (!viewCounted) {
+        setViewCounted(true)
+        supabase
+          .from('blog_posts')
+          .update({ views: (initialPost.views || 0) + 1 })
+          .eq('id', initialPost.id)
+          .then(({ error }) => {
+            if (error) console.error('Error updating view count:', error)
+          })
+      }
 
-        // Fetch related posts
-        if (post) {
-          const { data: relatedData } = await supabase
-            .from('blog_posts')
-            .select('*')
-            .eq('status', 'published')
-            .neq('id', post.id)
-            .order('published_at', { ascending: false })
-            .limit(3)
+      // Fetch related posts
+      const { data: relatedData } = await supabase
+        .from('blog_posts')
+        .select('*')
+        .eq('status', 'published')
+        .neq('id', initialPost.id)
+        .order('published_at', { ascending: false })
+        .limit(3)
 
-          if (relatedData) {
-            setRelatedPosts(relatedData)
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching related posts:', error)
-      } finally {
-        setLoading(false)
+      if (relatedData) {
+        setRelatedPosts(relatedData)
       }
     }
 
     fetchRelatedAndUpdateViews()
-  }, [post, viewCounted])
+  }, [initialPost.id, initialPost.views, viewCounted])
 
   const handleLike = () => {
     setLiked(!liked)

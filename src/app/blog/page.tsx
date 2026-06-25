@@ -53,6 +53,7 @@ export default function BlogPage() {
   const fetchPosts = async () => {
     setLoading(true)
     try {
+      // ✅ Use maybeSingle() or handle empty results
       const { data, error } = await supabase
         .from('blog_posts')
         .select('*')
@@ -74,6 +75,7 @@ export default function BlogPage() {
       }
     } catch (error) {
       console.error('Error fetching blog posts:', error)
+      setPosts([])
     } finally {
       setLoading(false)
     }
@@ -81,6 +83,7 @@ export default function BlogPage() {
 
   const fetchCategories = async () => {
     try {
+      // ✅ Handle empty results gracefully
       const { data, error } = await supabase
         .from('categories')
         .select('*')
@@ -90,6 +93,7 @@ export default function BlogPage() {
       setCategories(data || [])
     } catch (error) {
       console.error('Error fetching categories:', error)
+      setCategories([])
     }
   }
 

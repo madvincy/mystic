@@ -4,18 +4,19 @@ import { supabase } from '@/lib/supabase/client'
 import BlogPostClient from './BlogPostClient'
 import { notFound } from 'next/navigation'
 
-// ✅ Generate metadata for SEO
 export async function generateMetadata({ 
   params 
 }: { 
-  params: { slug: string } 
+  params: Promise<{ slug: string }> 
 }): Promise<Metadata> {
+  const { slug } = await params
+  
   const { data: post } = await supabase
     .from('blog_posts')
     .select('title, excerpt, featured_image')
-    .eq('slug', params.slug)
+    .eq('slug', slug)
     .eq('status', 'published')
-    .single()
+    .maybeSingle()
 
   if (!post) {
     return {
@@ -35,27 +36,23 @@ export async function generateMetadata({
   }
 }
 
-// ✅ Server Component - Fetches data and passes to client
-export default async function Page({ params }: { params: { slug: string } }) {
-  console.log('🔍 Fetching post with slug:', params.slug)
+export default async function Page({ 
+  params 
+}: { 
+  params: Promise<{ slug: string }> 
+}) {
+  const { slug } = await params
   
-  // Fetch the post data on the server
   const { data: post, error } = await supabase
     .from('blog_posts')
     .select('*')
-    .eq('slug', params.slug)
+    .eq('slug', slug)
     .eq('status', 'published')
-    .single()
+    .maybeSingle()
 
-  console.log('📦 Post data:', post)
-  console.log('❌ Error:', error)
-
-  // If no post found, show 404
-  if (!post || error) {
-    console.log('❌ Post not found, showing 404')
+  if (error || !post) {
     notFound()
   }
 
-  // Pass the post data to the client component
   return <BlogPostClient initialPost={post} />
 }
