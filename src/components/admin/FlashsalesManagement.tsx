@@ -1,7 +1,7 @@
 // src/components/admin/FlashSalesManagement.tsx
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { 
   Search, 
@@ -16,14 +16,15 @@ import {
   Clock,
   CheckCircle,
   XCircle,
-  Package
+  Package,
+  X
 } from 'lucide-react'
 import { Button } from '@/components/shadCn/ui/button'
 import { Input } from '@/components/shadCn/ui/input'
 import { Badge } from '@/components/shadCn/ui/badge'
 import { Card, CardContent } from '@/components/shadCn/ui/card'
 import { toast } from 'sonner'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
   Dialog,
   DialogContent,
@@ -54,6 +55,13 @@ interface FlashSale {
   created_at: string
 }
 
+interface Product {
+  id: string
+  name: string
+  price: number
+  images: string[]
+}
+
 export default function FlashSalesManagement() {
   const [flashSales, setFlashSales] = useState<FlashSale[]>([])
   const [loading, setLoading] = useState(true)
@@ -63,6 +71,14 @@ export default function FlashSalesManagement() {
   const [editingFlashSale, setEditingFlashSale] = useState<Partial<FlashSale>>({})
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [flashSaleToDelete, setFlashSaleToDelete] = useState<string | null>(null)
+
+  // ✅ Product search states
+  const [productSearch, setProductSearch] = useState('')
+  const [searchResults, setSearchResults] = useState<Product[]>([])
+  const [selectedProducts, setSelectedProducts] = useState<Product[]>([])
+  const [isSearching, setIsSearching] = useState(false)
+  const [showDropdown, setShowDropdown] = useState(false)
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   const itemsPerPage = 10
 
@@ -93,6 +109,57 @@ export default function FlashSalesManagement() {
     }
   }
 
+  // ✅ Product search handler with debounce
+  const handleProductSearch = (value: string) => {
+    setProductSearch(value)
+    setShowDropdown(value.length >= 3)
+
+    // Clear previous timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current)
+    }
+
+    if (value.length >= 3) {
+      setIsSearching(true)
+      searchTimeoutRef.current = setTimeout(async () => {
+        try {
+          const { data, error } = await supabase
+            .from('products')
+            .select('id, name, price, images')
+            .ilike('name', `%${value}%`)
+            .limit(10)
+
+          if (error) throw error
+          
+          // Filter out already selected products
+          const selectedIds = selectedProducts.map(p => p.id)
+          const filtered = (data || []).filter(p => !selectedIds.includes(p.id))
+          setSearchResults(filtered)
+        } catch (error) {
+          console.error('Error searching products:', error)
+        } finally {
+          setIsSearching(false)
+        }
+      }, 300) // Debounce 300ms
+    } else {
+      setSearchResults([])
+      setIsSearching(false)
+    }
+  }
+
+  // ✅ Add product to selection
+  const addProduct = (product: Product) => {
+    setSelectedProducts([...selectedProducts, product])
+    setSearchResults(searchResults.filter(p => p.id !== product.id))
+    setProductSearch('')
+    setShowDropdown(false)
+  }
+
+  // ✅ Remove product from selection
+  const removeProduct = (productId: string) => {
+    setSelectedProducts(selectedProducts.filter(p => p.id !== productId))
+  }
+
   const saveFlashSale = async () => {
     try {
       if (!editingFlashSale.name || !editingFlashSale.start_time || !editingFlashSale.end_time) {
@@ -109,6 +176,8 @@ export default function FlashSalesManagement() {
         updated_at: new Date().toISOString(),
       }
 
+      let flashSaleId: string
+
       if (editingFlashSale.id) {
         const { error } = await supabase
           .from('flash_sales')
@@ -116,21 +185,51 @@ export default function FlashSalesManagement() {
           .eq('id', editingFlashSale.id)
 
         if (error) throw error
+        flashSaleId = editingFlashSale.id
         toast.success('Flash sale updated')
       } else {
-        const { error } = await supabase
+        const { data: newFlashSale, error } = await supabase
           .from('flash_sales')
           .insert({
             ...data,
             created_at: new Date().toISOString(),
           })
+          .select()
+          .single()
 
         if (error) throw error
+        flashSaleId = newFlashSale.id
         toast.success('Flash sale created')
+      }
+
+      // ✅ Save selected products
+      if (selectedProducts.length > 0) {
+        // Delete existing products
+        await supabase
+          .from('flash_sale_products')
+          .delete()
+          .eq('flash_sale_id', flashSaleId)
+
+        // Insert new products
+        const productData = selectedProducts.map(product => ({
+          flash_sale_id: flashSaleId,
+          product_id: product.id,
+          sale_price: product.price * 0.8, // 20% discount by default
+          created_at: new Date().toISOString(),
+        }))
+
+        const { error: productError } = await supabase
+          .from('flash_sale_products')
+          .insert(productData)
+
+        if (productError) throw productError
       }
 
       setShowDialog(false)
       setEditingFlashSale({})
+      setSelectedProducts([])
+      setProductSearch('')
+      setSearchResults([])
       fetchFlashSales()
     } catch (error: any) {
       toast.error('Failed to save flash sale: ' + error.message)
@@ -140,13 +239,11 @@ export default function FlashSalesManagement() {
   const deleteFlashSale = async () => {
     if (!flashSaleToDelete) return
     try {
-      // Delete products first
       await supabase
         .from('flash_sale_products')
         .delete()
         .eq('flash_sale_id', flashSaleToDelete)
 
-      // Delete flash sale
       const { error } = await supabase
         .from('flash_sales')
         .delete()
@@ -172,6 +269,21 @@ export default function FlashSalesManagement() {
     currentPage * itemsPerPage
   )
 
+  // ✅ Load selected products when editing
+  useEffect(() => {
+    if (editingFlashSale.id && editingFlashSale.products) {
+      const products = editingFlashSale.products.map((p: any) => ({
+        id: p.product.id,
+        name: p.product.name,
+        price: p.product.price,
+        images: p.product.images || [],
+      }))
+      setSelectedProducts(products)
+    } else {
+      setSelectedProducts([])
+    }
+  }, [editingFlashSale])
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -188,6 +300,9 @@ export default function FlashSalesManagement() {
             className="bg-pink-600 hover:bg-pink-700 text-white"
             onClick={() => {
               setEditingFlashSale({})
+              setSelectedProducts([])
+              setProductSearch('')
+              setSearchResults([])
               setShowDialog(true)
             }}
           >
@@ -294,6 +409,12 @@ export default function FlashSalesManagement() {
                       className="flex-1"
                       onClick={() => {
                         setEditingFlashSale(flashSale)
+                        setSelectedProducts(flashSale.products?.map((p: any) => ({
+                          id: p.product.id,
+                          name: p.product.name,
+                          price: p.product.price,
+                          images: p.product.images || [],
+                        })) || [])
                         setShowDialog(true)
                       }}
                     >
@@ -350,7 +471,7 @@ export default function FlashSalesManagement() {
 
       {/* Flash Sale Dialog */}
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {editingFlashSale.id ? 'Edit Flash Sale' : 'Create Flash Sale'}
@@ -398,6 +519,87 @@ export default function FlashSalesManagement() {
               />
               <Label>Active</Label>
             </div>
+
+            {/* ✅ Product Search Section */}
+            <div className="space-y-2">
+              <Label>Products</Label>
+              <div className="relative">
+                <Input
+                  placeholder="Search products (min 3 characters)..."
+                  value={productSearch}
+                  onChange={(e) => handleProductSearch(e.target.value)}
+                  className="pr-10"
+                />
+                {isSearching && (
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-pink-600 border-t-transparent" />
+                  </div>
+                )}
+                
+                {/* ✅ Search Results Dropdown */}
+                <AnimatePresence>
+                  {showDropdown && searchResults.length > 0 && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-48 overflow-y-auto"
+                    >
+                      {searchResults.map((product) => (
+                        <button
+                          key={product.id}
+                          onClick={() => addProduct(product)}
+                          className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-3 transition-colors"
+                        >
+                          <div className="w-10 h-10 rounded overflow-hidden bg-gray-200 dark:bg-gray-700 flex-shrink-0">
+                            <img 
+                              src={product.images?.[0] || '/images/placeholder.jpg'} 
+                              alt={product.name}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                          <div>
+                            <p className="font-medium">{product.name}</p>
+                            <p className="text-sm text-gray-500">KSh {product.price.toLocaleString()}</p>
+                          </div>
+                        </button>
+                      ))}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {showDropdown && productSearch.length >= 3 && searchResults.length === 0 && !isSearching && (
+                  <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-4 text-center text-gray-500">
+                    No products found
+                  </div>
+                )}
+              </div>
+
+              {/* ✅ Selected Products */}
+              {selectedProducts.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {selectedProducts.map((product) => (
+                    <Badge
+                      key={product.id}
+                      className="bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-400 flex items-center gap-1 px-3 py-1.5"
+                    >
+                      {product.name}
+                      <button
+                        type="button"
+                        onClick={() => removeProduct(product.id)}
+                        className="ml-1 hover:text-pink-600"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              )}
+              <p className="text-xs text-gray-500">
+                {selectedProducts.length} product{selectedProducts.length !== 1 ? 's' : ''} selected
+              </p>
+            </div>
+
             <div className="flex gap-2 pt-4">
               <Button 
                 className="flex-1 bg-pink-600 hover:bg-pink-700 text-white"
@@ -411,6 +613,9 @@ export default function FlashSalesManagement() {
                 onClick={() => {
                   setShowDialog(false)
                   setEditingFlashSale({})
+                  setSelectedProducts([])
+                  setProductSearch('')
+                  setSearchResults([])
                 }}
               >
                 Cancel

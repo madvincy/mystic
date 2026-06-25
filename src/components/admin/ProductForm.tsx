@@ -14,10 +14,17 @@ import { Textarea } from '@/components/shadCn/ui/textarea'
 import { Label } from '@/components/shadCn/ui/label'
 import { Switch } from '@/components/shadCn/ui/switch'
 import { toast } from 'sonner'
-import { Plus, Trash2, Upload, X, Image as ImageIcon } from 'lucide-react'
+import { Plus, Trash2, Upload, X, Image as ImageIcon, Wine } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase/client'
 import { clearAllCache } from '@/lib/db/indexedDB'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/shadCn/ui/select'
 
 // Helper function to generate slug
 const generateSlug = (name: string): string => {
@@ -71,7 +78,7 @@ const cleanImageArray = (images: string[]): string[] => {
     .map(url => url.trim())
 }
 
-// Zod schema with images
+// ✅ Updated Zod schema with product_type and abv
 const productSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   slug: z.string().optional(),
@@ -79,6 +86,8 @@ const productSchema = z.object({
   price: z.number().min(0, 'Price must be positive'),
   category_id: z.string().min(1, 'Category is required'),
   subcategory_id: z.string().optional().nullable(),
+  product_type: z.enum(['alcoholic', 'non_alcoholic', 'non_applicable']).default('non_applicable'),
+  abv: z.number().min(0, 'ABV must be between 0 and 100').max(100, 'ABV must be between 0 and 100').optional().nullable(),
   is_featured: z.boolean().default(false),
   is_bestseller: z.boolean().default(false),
   is_new: z.boolean().default(false),
@@ -90,6 +99,7 @@ const productSchema = z.object({
     price: z.number().min(0, 'Price must be positive'),
     stock: z.number().min(0, 'Stock must be positive'),
     sku: z.string().optional(),
+    abv: z.number().min(0, 'ABV must be between 0 and 100').max(100, 'ABV must be between 0 and 100').optional().nullable(),
   })).default([]),
 })
 
@@ -121,6 +131,8 @@ export default function ProductForm({ initialData, onSuccess, onCancel }: Produc
     defaultValues: initialData ? {
       ...initialData,
       subcategory_id: initialData.subcategory_id || undefined,
+      product_type: initialData.product_type || 'non_applicable',
+      abv: initialData.abv || null,
       variants: initialData.variants || [],
       images: cleanImageArray(initialData.images || []),
     } : {
@@ -128,6 +140,8 @@ export default function ProductForm({ initialData, onSuccess, onCancel }: Produc
       is_featured: false,
       is_bestseller: false,
       is_new: false,
+      product_type: 'non_applicable',
+      abv: null,
       variants: [],
       slug: '',
       subcategory_id: undefined,
@@ -142,6 +156,7 @@ export default function ProductForm({ initialData, onSuccess, onCancel }: Produc
 
   const selectedCategory = watch('category_id')
   const productName = watch('name')
+  const productType = watch('product_type')
 
   useEffect(() => {
     const cleanedImages = cleanImageArray(imageUrls)
@@ -248,6 +263,7 @@ export default function ProductForm({ initialData, onSuccess, onCancel }: Produc
         description: data.description,
         price: data.price,
         category_id: data.category_id,
+        product_type: data.product_type || 'non_applicable',
         is_featured: data.is_featured,
         is_bestseller: data.is_bestseller,
         is_new: data.is_new,
@@ -255,6 +271,11 @@ export default function ProductForm({ initialData, onSuccess, onCancel }: Produc
         images: images,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
+      }
+
+      // ✅ Add ABV only if product is alcoholic
+      if (data.product_type === 'alcoholic' && data.abv !== null && data.abv !== undefined) {
+        productData.abv = data.abv
       }
 
       if (data.subcategory_id && data.subcategory_id !== '') {
@@ -312,12 +333,18 @@ export default function ProductForm({ initialData, onSuccess, onCancel }: Produc
         description: data.description,
         price: data.price,
         category_id: data.category_id,
+        product_type: data.product_type || 'non_applicable',
         is_featured: data.is_featured,
         is_bestseller: data.is_bestseller,
         is_new: data.is_new,
         stock_status: data.stock_status,
         images: images,
         updated_at: new Date().toISOString(),
+      }
+
+      // ✅ Add ABV only if product is alcoholic
+      if (data.product_type === 'alcoholic' && data.abv !== null && data.abv !== undefined) {
+        productData.abv = data.abv
       }
 
       if (data.subcategory_id && data.subcategory_id !== '') {
@@ -362,7 +389,7 @@ export default function ProductForm({ initialData, onSuccess, onCancel }: Produc
     }
   }
 
-  // ✅ SUBMIT HANDLER - FIXED
+  // ✅ SUBMIT HANDLER
   const onSubmit = async (data: ProductFormData) => {
     setLoading(true)
     try {
@@ -379,9 +406,8 @@ export default function ProductForm({ initialData, onSuccess, onCancel }: Produc
         toast.success('Product created successfully!')
       }
       
-      // ✅ Clear cache and refresh products - NO ARGUMENTS
       await clearAllCache()
-      await dispatch(fetchProducts()).unwrap() // ✅ fetchProducts takes no arguments
+      await dispatch(fetchProducts()).unwrap()
       
       toast.info('Products synced', { duration: 2000 })
       onSuccess?.()
@@ -394,7 +420,7 @@ export default function ProductForm({ initialData, onSuccess, onCancel }: Produc
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 w-full">
       {/* Basic Info */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2">
@@ -489,6 +515,38 @@ export default function ProductForm({ initialData, onSuccess, onCancel }: Produc
               <option key={sub.id} value={sub.id}>{sub.name}</option>
             ))}
           </select>
+        </div>
+      </div>
+
+      {/* ✅ Product Type & ABV Section */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>Product Type</Label>
+          <select
+            {...register('product_type')}
+            className="w-full rounded-md border border-input bg-background px-3 py-2"
+          >
+            <option value="non_applicable">Non-Applicable</option>
+            <option value="non_alcoholic">Non-Alcoholic</option>
+            <option value="alcoholic">Alcoholic</option>
+          </select>
+        </div>
+        <div className="space-y-2">
+          <Label>Alcohol by Volume (ABV) %</Label>
+          <Input
+            type="number"
+            step="0.5"
+            min="0"
+            max="100"
+            {...register('abv', { valueAsNumber: true })}
+            placeholder="e.g., 12.5"
+            disabled={productType !== 'alcoholic'}
+            className={productType !== 'alcoholic' ? 'bg-gray-50 dark:bg-gray-800 opacity-50' : ''}
+          />
+          {productType === 'alcoholic' && (
+            <p className="text-xs text-gray-500">Enter ABV value between 0% and 100%</p>
+          )}
+          {errors.abv && <p className="text-red-500 text-sm">{errors.abv.message}</p>}
         </div>
       </div>
 
@@ -602,7 +660,7 @@ export default function ProductForm({ initialData, onSuccess, onCancel }: Produc
         </div>
       </div>
 
-      {/* Variants */}
+      {/* Variants with ABV Support */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <Label>Product Variants</Label>
@@ -614,6 +672,7 @@ export default function ProductForm({ initialData, onSuccess, onCancel }: Produc
               price: 0,
               stock: 0,
               sku: '',
+              abv: null,
             })}
             variant="outline"
             size="sm"
@@ -629,7 +688,7 @@ export default function ProductForm({ initialData, onSuccess, onCancel }: Produc
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="grid grid-cols-1 md:grid-cols-5 gap-3 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg"
+              className="grid grid-cols-1 md:grid-cols-6 gap-3 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg"
             >
               <div>
                 <Input
@@ -670,6 +729,20 @@ export default function ProductForm({ initialData, onSuccess, onCancel }: Produc
                   <p className="text-red-500 text-xs mt-1">{errors.variants[index]?.stock?.message}</p>
                 )}
               </div>
+              {/* ✅ ABV Field for Variants */}
+              <div>
+                <Input
+                  type="number"
+                  step="0.5"
+                  min="0"
+                  max="100"
+                  {...register(`variants.${index}.abv`, { valueAsNumber: true })}
+                  placeholder="ABV % (optional)"
+                />
+                {errors.variants?.[index]?.abv && (
+                  <p className="text-red-500 text-xs mt-1">{errors.variants[index]?.abv?.message}</p>
+                )}
+              </div>
               <div className="flex gap-2">
                 <Input
                   {...register(`variants.${index}.sku`)}
@@ -688,6 +761,9 @@ export default function ProductForm({ initialData, onSuccess, onCancel }: Produc
             </motion.div>
           ))}
         </AnimatePresence>
+        <p className="text-xs text-gray-500">
+          Each variant can have its own ABV value for alcoholic products.
+        </p>
       </div>
 
       {/* Actions */}

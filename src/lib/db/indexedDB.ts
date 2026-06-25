@@ -9,7 +9,7 @@ export async function getDB() {
   if (!dbInstance) {
     dbInstance = await openDB(dbName, dbVersion, {
       upgrade(db, oldVersion, newVersion) {
-        console.log('🔄 Upgrading IndexedDB from version', oldVersion, 'to', newVersion)
+        // console.log('🔄 Upgrading IndexedDB from version', oldVersion, 'to', newVersion)
         
         if (!db.objectStoreNames.contains('products')) {
           const productStore = db.createObjectStore('products', { keyPath: 'id' })
@@ -21,52 +21,52 @@ export async function getDB() {
           productStore.createIndex('slug', 'slug')
           productStore.createIndex('stock_status', 'stock_status')
           productStore.createIndex('created_at', 'created_at')
-          console.log('✅ Created products store')
+          // console.log('✅ Created products store')
         }
         
         if (!db.objectStoreNames.contains('categories')) {
           const categoryStore = db.createObjectStore('categories', { keyPath: 'id' })
           categoryStore.createIndex('slug', 'slug')
           categoryStore.createIndex('parent_id', 'parent_id')
-          console.log('✅ Created categories store')
+          // console.log('✅ Created categories store')
         }
         
         if (!db.objectStoreNames.contains('subcategories')) {
           const subcategoryStore = db.createObjectStore('subcategories', { keyPath: 'id' })
           subcategoryStore.createIndex('category_id', 'category_id')
           subcategoryStore.createIndex('slug', 'slug')
-          console.log('✅ Created subcategories store')
+          // console.log('✅ Created subcategories store')
         }
         
         if (!db.objectStoreNames.contains('variants')) {
           const variantStore = db.createObjectStore('variants', { keyPath: 'id' })
           variantStore.createIndex('product_id', 'product_id')
-          console.log('✅ Created variants store')
+          // console.log('✅ Created variants store')
         }
         
         if (!db.objectStoreNames.contains('cart')) {
           db.createObjectStore('cart', { keyPath: 'id' })
-          console.log('✅ Created cart store')
+          // console.log('✅ Created cart store')
         }
         
         if (!db.objectStoreNames.contains('discounts')) {
           db.createObjectStore('discounts', { keyPath: 'id' })
-          console.log('✅ Created discounts store')
+          // console.log('✅ Created discounts store')
         }
         
         if (!db.objectStoreNames.contains('flash_sales')) {
           db.createObjectStore('flash_sales', { keyPath: 'id' })
-          console.log('✅ Created flash_sales store')
+          // console.log('✅ Created flash_sales store')
         }
         
         if (!db.objectStoreNames.contains('featured_products')) {
           db.createObjectStore('featured_products', { keyPath: 'id' })
-          console.log('✅ Created featured_products store')
+          // console.log('✅ Created featured_products store')
         }
         
         if (!db.objectStoreNames.contains('wishlist')) {
           db.createObjectStore('wishlist', { keyPath: 'id' })
-          console.log('✅ Created wishlist store')
+          // console.log('✅ Created wishlist store')
         }
         
         if (!db.objectStoreNames.contains('sync_queue')) {
@@ -78,7 +78,7 @@ export async function getDB() {
           syncStore.createIndex('operation', 'operation')
           syncStore.createIndex('created_at', 'created_at')
           syncStore.createIndex('synced', 'synced')
-          console.log('✅ Created sync_queue store')
+          // console.log('✅ Created sync_queue store')
         }
       },
     })
@@ -96,7 +96,7 @@ export async function getFromCache<T = any>(storeName: string, key?: string): Pr
     }
     return db.getAll(storeName) as Promise<T[]>
   } catch (error) {
-    console.error(`❌ Error getting from cache (${storeName}):`, error)
+    // console.error(`❌ Error getting from cache (${storeName}):`, error)
     return [] as T[]
   }
 }
@@ -108,7 +108,7 @@ export async function saveToCache(storeName: string, data: any): Promise<void> {
     await tx.store.put(data)
     await tx.done
   } catch (error) {
-    console.error(`❌ Error saving to cache (${storeName}):`, error)
+    // console.error(`❌ Error saving to cache (${storeName}):`, error)
   }
 }
 
@@ -119,7 +119,7 @@ export async function deleteFromCache(storeName: string, key: string): Promise<v
     await tx.store.delete(key)
     await tx.done
   } catch (error) {
-    console.error(`❌ Error deleting from cache (${storeName}):`, error)
+    // console.error(`❌ Error deleting from cache (${storeName}):`, error)
   }
 }
 
@@ -129,9 +129,9 @@ export async function clearCache(storeName: string): Promise<void> {
     const tx = db.transaction(storeName, 'readwrite')
     await tx.store.clear()
     await tx.done
-    console.log(`🗑️ Cleared cache for: ${storeName}`)
+    // console.log(`🗑️ Cleared cache for: ${storeName}`)
   } catch (error) {
-    console.error(`❌ Error clearing cache (${storeName}):`, error)
+    // console.error(`❌ Error clearing cache (${storeName}):`, error)
   }
 }
 
@@ -145,9 +145,9 @@ export async function batchSaveToCache(storeName: string, items: any[]): Promise
       await tx.store.put(item)
     }
     await tx.done
-    console.log(`✅ Batch saved ${items.length} items to ${storeName}`)
+    // console.log(`✅ Batch saved ${items.length} items to ${storeName}`)
   } catch (error) {
-    console.error(`❌ Error batch saving to cache (${storeName}):`, error)
+    // console.error(`❌ Error batch saving to cache (${storeName}):`, error)
   }
 }
 
@@ -162,7 +162,7 @@ export async function getByIndex<T = any>(
     const index = tx.store.index(indexName)
     return index.getAll(value) as Promise<T[]>
   } catch (error) {
-    console.error(`❌ Error getting by index (${storeName}.${indexName}):`, error)
+    // console.error(`❌ Error getting by index (${storeName}.${indexName}):`, error)
     return []
   }
 }
@@ -174,19 +174,19 @@ export async function clearAllCache(): Promise<void> {
     const db = await getDB()
     const storeNames = db.objectStoreNames
     
-    console.log('🗑️ Clearing all cache...')
+    // console.log('🗑️ Clearing all cache...')
     
     for (const name of storeNames) {
       if (name === 'sync_queue') continue
       const tx = db.transaction(name, 'readwrite')
       await tx.store.clear()
       await tx.done
-      console.log(`🗑️ Cleared store: ${name}`)
+      // console.log(`🗑️ Cleared store: ${name}`)
     }
     
-    console.log('✅ All cache cleared successfully')
+    // console.log('✅ All cache cleared successfully')
   } catch (error) {
-    console.error('❌ Error clearing all cache:', error)
+    // console.error('❌ Error clearing all cache:', error)
     throw error
   }
 }
@@ -197,13 +197,13 @@ export async function clearProductsCache(): Promise<void> {
   await clearCache('discounts')
   await clearCache('flash_sales')
   await clearCache('featured_products')
-  console.log('✅ Products cache cleared')
+  // console.log('✅ Products cache cleared')
 }
 
 export async function clearCategoriesCache(): Promise<void> {
   await clearCache('categories')
   await clearCache('subcategories')
-  console.log('✅ Categories cache cleared')
+  // console.log('✅ Categories cache cleared')
 }
 
 // ============ SYNC QUEUE OPERATIONS ============
@@ -233,10 +233,10 @@ export async function addToSyncQueue(
       synced: false,
     })
     await tx.done
-    console.log(`📝 Added to sync queue: ${table} - ${operation}`)
+    // console.log(`📝 Added to sync queue: ${table} - ${operation}`)
     return result as number
   } catch (error) {
-    console.error('❌ Error adding to sync queue:', error)
+    // console.error('❌ Error adding to sync queue:', error)
     throw error
   }
 }
@@ -248,7 +248,7 @@ export async function getPendingSyncItems(): Promise<SyncQueueItem[]> {
     const items = await tx.store.getAll()
     return items.filter(item => !item.synced)
   } catch (error) {
-    console.error('❌ Error getting pending sync items:', error)
+    // console.error('❌ Error getting pending sync items:', error)
     return []
   }
 }
@@ -263,9 +263,9 @@ export async function markSyncComplete(id: number): Promise<void> {
       await tx.store.put(item)
     }
     await tx.done
-    console.log(`✅ Marked sync complete for id: ${id}`)
+    // console.log(`✅ Marked sync complete for id: ${id}`)
   } catch (error) {
-    console.error('❌ Error marking sync complete:', error)
+    // console.error('❌ Error marking sync complete:', error)
   }
 }
 
@@ -280,9 +280,9 @@ export async function clearSyncedItems(): Promise<void> {
       if (id) await tx.store.delete(id)
     }
     await tx.done
-    console.log(`🗑️ Cleared ${syncedIds.length} synced items from queue`)
+    // console.log(`🗑️ Cleared ${syncedIds.length} synced items from queue`)
   } catch (error) {
-    console.error('❌ Error clearing synced items:', error)
+    // console.error('❌ Error clearing synced items:', error)
   }
 }
 
@@ -345,10 +345,10 @@ export async function syncWithMetrics(
       fromCache: false,
     }
 
-    console.log('📊 Sync Performance:', metrics)
+    // console.log('📊 Sync Performance:', metrics)
     return metrics
   } catch (error) {
-    console.error('❌ Sync failed:', error)
+    // console.error('❌ Sync failed:', error)
     throw error
   }
 }
@@ -368,7 +368,7 @@ export async function getCacheStats(): Promise<Record<string, number>> {
     
     return stats
   } catch (error) {
-    console.error('❌ Error getting cache stats:', error)
+    // console.error('❌ Error getting cache stats:', error)
     return {}
   }
 }
@@ -378,18 +378,18 @@ export async function clearDatabase(): Promise<void> {
     const db = await getDB()
     const storeNames = db.objectStoreNames
     
-    console.log('🗑️ Clearing entire database...')
+    // console.log('🗑️ Clearing entire database...')
     
     for (const name of storeNames) {
       const tx = db.transaction(name, 'readwrite')
       await tx.store.clear()
       await tx.done
-      console.log(`🗑️ Cleared store: ${name}`)
+      // console.log(`🗑️ Cleared store: ${name}`)
     }
     
-    console.log('✅ Entire database cleared successfully')
+    // console.log('✅ Entire database cleared successfully')
   } catch (error) {
-    console.error('❌ Error clearing database:', error)
+    // console.error('❌ Error clearing database:', error)
     throw error
   }
 }

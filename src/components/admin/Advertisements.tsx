@@ -1,7 +1,7 @@
 // src/components/admin/Advertisements.tsx
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { 
   Search, 
@@ -19,14 +19,16 @@ import {
   Tag,
   Filter,
   Calendar,
-  X
+  X,
+  ShoppingBag,
+  Layers
 } from 'lucide-react'
 import { Button } from '@/components/shadCn/ui/button'
 import { Input } from '@/components/shadCn/ui/input'
 import { Badge } from '@/components/shadCn/ui/badge'
 import { Card, CardContent } from '@/components/shadCn/ui/card'
 import { toast } from 'sonner'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
   Dialog,
   DialogContent,
@@ -57,11 +59,14 @@ import {
 interface Advertisement {
   id: string
   title: string
+  description: string
   image_url: string
   link_url: string
-  product_id: string | null
+  product_ids: string[]
   category_id: string | null
   subcategory_id: string | null
+  display_type: 'product' | 'category' | 'subcategory' | 'custom' | 'multiple_products'
+  cta_text: string
   placement: string
   ad_type: string
   order_position: number
@@ -71,15 +76,23 @@ interface Advertisement {
   clicks: number
   impressions: number
   created_at: string
-  product?: {
-    name: string
-  }
+  products?: Product[]
   category?: {
+    id: string
     name: string
   }
   subcategory?: {
+    id: string
     name: string
   }
+}
+
+interface Product {
+  id: string
+  name: string
+  price: number
+  images: string[]
+  slug: string
 }
 
 export default function Advertisements() {
@@ -91,11 +104,19 @@ export default function Advertisements() {
   const [editingAd, setEditingAd] = useState<Partial<Advertisement>>({})
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [adToDelete, setAdToDelete] = useState<string | null>(null)
-  const [products, setProducts] = useState<any[]>([])
+  const [products, setProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<any[]>([])
   const [subcategories, setSubcategories] = useState<any[]>([])
   const [filterType, setFilterType] = useState<string>('all')
   const [filterPlacement, setFilterPlacement] = useState<string>('all')
+
+  // ✅ Product search states for multi-select
+  const [productSearch, setProductSearch] = useState('')
+  const [searchResults, setSearchResults] = useState<Product[]>([])
+  const [selectedProducts, setSelectedProducts] = useState<Product[]>([])
+  const [isSearching, setIsSearching] = useState(false)
+  const [showDropdown, setShowDropdown] = useState(false)
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   const itemsPerPage = 10
 
@@ -108,18 +129,34 @@ export default function Advertisements() {
   const fetchAds = async () => {
     setLoading(true)
     try {
-      const { data, error } = await supabase
+      // First fetch ads
+      const { data: adsData, error: adsError } = await supabase
         .from('advertisements')
         .select(`
           *,
-          product:products(name),
           category:categories(name),
           subcategory:subcategories(name)
         `)
         .order('order_position')
 
-      if (error) throw error
-      setAds(data || [])
+      if (adsError) throw adsError
+
+      // Fetch products for each ad that has product_ids
+      const adsWithProducts = await Promise.all(
+        (adsData || []).map(async (ad) => {
+          if (ad.product_ids && ad.product_ids.length > 0) {
+            const { data: productsData } = await supabase
+              .from('products')
+              .select('id, name, price, images, slug')
+              .in('id', ad.product_ids)
+            
+            return { ...ad, products: productsData || [] }
+          }
+          return { ...ad, products: [] }
+        })
+      )
+
+      setAds(adsWithProducts || [])
     } catch (error: any) {
       toast.error('Failed to fetch ads: ' + error.message)
     } finally {
@@ -131,7 +168,7 @@ export default function Advertisements() {
     try {
       const { data, error } = await supabase
         .from('products')
-        .select('id, name')
+        .select('id, name, price, images, slug')
         .order('name')
 
       if (error) throw error
@@ -174,6 +211,49 @@ export default function Advertisements() {
     }
   }
 
+  // ✅ Product search handler with debounce
+  const handleProductSearch = (value: string) => {
+    setProductSearch(value)
+    setShowDropdown(value.length >= 3)
+
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current)
+    }
+
+    if (value.length >= 3) {
+      setIsSearching(true)
+      searchTimeoutRef.current = setTimeout(async () => {
+        try {
+          const filtered = products.filter(p => 
+            p.name.toLowerCase().includes(value.toLowerCase()) &&
+            !selectedProducts.some(sp => sp.id === p.id)
+          )
+          setSearchResults(filtered.slice(0, 10))
+        } catch (error) {
+          console.error('Error searching products:', error)
+        } finally {
+          setIsSearching(false)
+        }
+      }, 300)
+    } else {
+      setSearchResults([])
+      setIsSearching(false)
+    }
+  }
+
+  // ✅ Add product to selection
+  const addProduct = (product: Product) => {
+    setSelectedProducts([...selectedProducts, product])
+    setSearchResults(searchResults.filter(p => p.id !== product.id))
+    setProductSearch('')
+    setShowDropdown(false)
+  }
+
+  // ✅ Remove product from selection
+  const removeProduct = (productId: string) => {
+    setSelectedProducts(selectedProducts.filter(p => p.id !== productId))
+  }
+
   const saveAd = async () => {
     try {
       if (!editingAd.image_url) {
@@ -181,13 +261,19 @@ export default function Advertisements() {
         return
       }
 
+      // ✅ Get product IDs from selected products
+      const productIds = selectedProducts.map(p => p.id)
+
       const data = {
         title: editingAd.title || '',
+        description: editingAd.description || '',
         image_url: editingAd.image_url,
         link_url: editingAd.link_url || '',
-        product_id: editingAd.product_id || null,
+        product_ids: productIds,
         category_id: editingAd.category_id || null,
         subcategory_id: editingAd.subcategory_id || null,
+        display_type: editingAd.display_type || 'custom',
+        cta_text: editingAd.cta_text || 'Shop Now',
         placement: editingAd.placement || 'all',
         ad_type: editingAd.ad_type || 'banner',
         order_position: editingAd.order_position || ads.length + 1,
@@ -219,6 +305,9 @@ export default function Advertisements() {
 
       setShowDialog(false)
       setEditingAd({})
+      setSelectedProducts([])
+      setProductSearch('')
+      setSearchResults([])
       fetchAds()
     } catch (error: any) {
       toast.error('Failed to save ad: ' + error.message)
@@ -287,9 +376,18 @@ export default function Advertisements() {
     fetchAds()
   }
 
+  // ✅ Load selected products when editing
+  useEffect(() => {
+    if (editingAd.id && editingAd.product_ids) {
+      const productsData = editingAd.products || []
+      setSelectedProducts(productsData)
+    } else {
+      setSelectedProducts([])
+    }
+  }, [editingAd])
+
   const filteredAds = ads.filter(a => {
-    const matchesSearch = a.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      a.product?.name?.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesSearch = a.title?.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesType = filterType === 'all' || a.ad_type === filterType
     const matchesPlacement = filterPlacement === 'all' || a.placement === filterPlacement
     return matchesSearch && matchesType && matchesPlacement
@@ -338,7 +436,10 @@ export default function Advertisements() {
           <Button 
             className="bg-pink-600 hover:bg-pink-700 text-white"
             onClick={() => {
-              setEditingAd({ is_active: true, placement: 'all', ad_type: 'banner' })
+              setEditingAd({ is_active: true, placement: 'all', ad_type: 'banner', display_type: 'custom' })
+              setSelectedProducts([])
+              setProductSearch('')
+              setSearchResults([])
               setShowDialog(true)
             }}
           >
@@ -438,25 +539,19 @@ export default function Advertisements() {
                   </div>
                   <div>
                     <h3 className="font-medium">{ad.title || 'Untitled'}</h3>
-                    {ad.product && (
-                      <p className="text-sm text-gray-500">
-                        Product: {ad.product.name}
-                      </p>
+                    {ad.display_type === 'multiple_products' && ad.products && ad.products.length > 0 && (
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        <Layers className="h-3 w-3 text-pink-600" />
+                        <span className="text-xs text-gray-500">
+                          {ad.products.length} products
+                        </span>
+                      </div>
                     )}
-                    {ad.category && (
-                      <p className="text-sm text-gray-500">
-                        Category: {ad.category.name}
-                      </p>
+                    {ad.display_type === 'category' && ad.category && (
+                      <p className="text-sm text-blue-600">Category: {ad.category.name}</p>
                     )}
-                    {ad.subcategory && (
-                      <p className="text-sm text-gray-500">
-                        Subcategory: {ad.subcategory.name}
-                      </p>
-                    )}
-                    {ad.link_url && (
-                      <p className="text-xs text-gray-400 truncate">
-                        Link: {ad.link_url}
-                      </p>
+                    {ad.display_type === 'subcategory' && ad.subcategory && (
+                      <p className="text-sm text-purple-600">Subcategory: {ad.subcategory.name}</p>
                     )}
                     <div className="flex items-center gap-2 mt-1 text-xs text-gray-400">
                       <span>Clicks: {ad.clicks || 0}</span>
@@ -495,6 +590,7 @@ export default function Advertisements() {
                       className="flex-1"
                       onClick={() => {
                         setEditingAd(ad)
+                        setSelectedProducts(ad.products || [])
                         if (ad.category_id) {
                           fetchSubcategories(ad.category_id)
                         }
@@ -565,7 +661,16 @@ export default function Advertisements() {
               <Input
                 value={editingAd.title || ''}
                 onChange={(e) => setEditingAd({ ...editingAd, title: e.target.value })}
-                placeholder="Ad title"
+                placeholder="Johnnie Walker Family"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Description</Label>
+              <Textarea
+                value={editingAd.description || ''}
+                onChange={(e) => setEditingAd({ ...editingAd, description: e.target.value })}
+                placeholder="Explore the complete Johnnie Walker collection"
+                rows={2}
               />
             </div>
             <div className="space-y-2">
@@ -573,17 +678,209 @@ export default function Advertisements() {
               <Input
                 value={editingAd.image_url || ''}
                 onChange={(e) => setEditingAd({ ...editingAd, image_url: e.target.value })}
-                placeholder="https://example.com/image.jpg"
+                placeholder="https://example.com/johnnie-walker-family.jpg"
               />
             </div>
+
+            {/* Display Type Selection */}
             <div className="space-y-2">
-              <Label>Link URL</Label>
+              <Label>Display Type</Label>
+              <Select
+                value={editingAd.display_type || 'custom'}
+                onValueChange={(value: any) => {
+                  setEditingAd({ 
+                    ...editingAd, 
+                    display_type: value,
+                    product_ids: [],
+                    category_id: null,
+                    subcategory_id: null
+                  })
+                  if (value !== 'multiple_products') {
+                    setSelectedProducts([])
+                  }
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select display type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="custom">Custom (Link Only)</SelectItem>
+                  <SelectItem value="multiple_products">Multiple Products</SelectItem>
+                  <SelectItem value="category">Category Products</SelectItem>
+                  <SelectItem value="subcategory">Subcategory Products</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Multiple Products Selection */}
+            {editingAd.display_type === 'product' ||editingAd.display_type === 'multiple_products' && (
+              <div className="space-y-2">
+                <Label>Select Products</Label>
+                <div className="relative">
+                  <Input
+                    placeholder="Search products (min 3 characters)..."
+                    value={productSearch}
+                    onChange={(e) => handleProductSearch(e.target.value)}
+                    className="pr-10"
+                  />
+                  {isSearching && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-pink-600 border-t-transparent" />
+                    </div>
+                  )}
+                  
+                  {/* Search Results Dropdown */}
+                  <AnimatePresence>
+                    {showDropdown && searchResults.length > 0 && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-48 overflow-y-auto"
+                      >
+                        {searchResults.map((product) => (
+                          <button
+                            key={product.id}
+                            onClick={() => addProduct(product)}
+                            className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-3 transition-colors"
+                          >
+                            <div className="w-10 h-10 rounded overflow-hidden bg-gray-200 dark:bg-gray-700 flex-shrink-0">
+                              <img 
+                                src={product.images?.[0] || '/images/placeholder.jpg'} 
+                                alt={product.name}
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                            <div>
+                              <p className="font-medium">{product.name}</p>
+                              <p className="text-sm text-gray-500">KSh {product.price.toLocaleString()}</p>
+                            </div>
+                          </button>
+                        ))}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  {showDropdown && productSearch.length >= 3 && searchResults.length === 0 && !isSearching && (
+                    <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-4 text-center text-gray-500">
+                      No products found
+                    </div>
+                  )}
+                </div>
+
+                {/* Selected Products */}
+                {selectedProducts.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {selectedProducts.map((product) => (
+                      <Badge
+                        key={product.id}
+                        className="bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-400 flex items-center gap-1 px-3 py-1.5"
+                      >
+                        <img 
+                          src={product.images?.[0] || '/images/placeholder.jpg'} 
+                          alt={product.name}
+                          className="w-5 h-5 rounded object-cover"
+                        />
+                        {product.name}
+                        <button
+                          type="button"
+                          onClick={() => removeProduct(product.id)}
+                          className="ml-1 hover:text-pink-600"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+                <p className="text-xs text-gray-500">
+                  {selectedProducts.length} product{selectedProducts.length !== 1 ? 's' : ''} selected
+                </p>
+              </div>
+            )}
+
+            {/* Category Selection */}
+            {editingAd.display_type === 'category' && (
+              <div className="space-y-2">
+                <Label>Select Category</Label>
+                <Select
+                  value={editingAd.category_id || ''}
+                  onValueChange={(value) => {
+                    setEditingAd({ ...editingAd, category_id: value || null })
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map((cat) => (
+                      <SelectItem key={cat.id} value={cat.id}>
+                        {cat.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {/* Subcategory Selection */}
+            {editingAd.display_type === 'subcategory' && (
+              <div className="space-y-2">
+                <Label>Select Category First</Label>
+                <Select
+                  value={editingAd.category_id || ''}
+                  onValueChange={(value) => {
+                    setEditingAd({ ...editingAd, category_id: value || null })
+                    if (value) {
+                      fetchSubcategories(value)
+                    } else {
+                      setSubcategories([])
+                    }
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map((cat) => (
+                      <SelectItem key={cat.id} value={cat.id}>
+                        {cat.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {editingAd.category_id && (
+                  <>
+                    <Label className="mt-2">Select Subcategory</Label>
+                    <Select
+                      value={editingAd.subcategory_id || ''}
+                      onValueChange={(value) => setEditingAd({ ...editingAd, subcategory_id: value || null })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a subcategory" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {subcategories.map((sub) => (
+                          <SelectItem key={sub.id} value={sub.id}>
+                            {sub.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </>
+                )}
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label>CTA Text</Label>
               <Input
-                value={editingAd.link_url || ''}
-                onChange={(e) => setEditingAd({ ...editingAd, link_url: e.target.value })}
-                placeholder="https://example.com"
+                value={editingAd.cta_text || ''}
+                onChange={(e) => setEditingAd({ ...editingAd, cta_text: e.target.value })}
+                placeholder="Shop Now"
               />
             </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Ad Type</Label>
@@ -622,28 +919,8 @@ export default function Advertisements() {
                 </Select>
               </div>
             </div>
+
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Product (optional)</Label>
-                <Select
-                  value={editingAd.product_id || ''}
-                  onValueChange={(value) => {
-                    setEditingAd({ ...editingAd, product_id: value || null })
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select product" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">None</SelectItem>
-                    {products.map((product) => (
-                      <SelectItem key={product.id} value={product.id}>
-                        {product.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
               <div className="space-y-2">
                 <Label>Order Position</Label>
                 <Input
@@ -653,55 +930,15 @@ export default function Advertisements() {
                   placeholder="0"
                 />
               </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Category (for targeted ads)</Label>
-                <Select
-                  value={editingAd.category_id || ''}
-                  onValueChange={(value) => {
-                    setEditingAd({ ...editingAd, category_id: value || null })
-                    if (value) {
-                      fetchSubcategories(value)
-                    } else {
-                      setSubcategories([])
-                    }
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">None</SelectItem>
-                    {categories.map((cat) => (
-                      <SelectItem key={cat.id} value={cat.id}>
-                        {cat.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Subcategory (for targeted ads)</Label>
-                <Select
-                  value={editingAd.subcategory_id || ''}
-                  onValueChange={(value) => setEditingAd({ ...editingAd, subcategory_id: value || null })}
-                  disabled={!editingAd.category_id}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select subcategory" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">None</SelectItem>
-                    {subcategories.map((sub) => (
-                      <SelectItem key={sub.id} value={sub.id}>
-                        {sub.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div className="flex items-center gap-2 mt-6">
+                <Switch
+                  checked={editingAd.is_active !== undefined ? editingAd.is_active : true}
+                  onCheckedChange={(checked) => setEditingAd({ ...editingAd, is_active: checked })}
+                />
+                <Label>Active</Label>
               </div>
             </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Start Date (optional)</Label>
@@ -720,13 +957,7 @@ export default function Advertisements() {
                 />
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Switch
-                checked={editingAd.is_active !== undefined ? editingAd.is_active : true}
-                onCheckedChange={(checked) => setEditingAd({ ...editingAd, is_active: checked })}
-              />
-              <Label>Active</Label>
-            </div>
+
             <div className="flex gap-2 pt-4">
               <Button 
                 className="flex-1 bg-pink-600 hover:bg-pink-700 text-white"
@@ -740,6 +971,9 @@ export default function Advertisements() {
                 onClick={() => {
                   setShowDialog(false)
                   setEditingAd({})
+                  setSelectedProducts([])
+                  setProductSearch('')
+                  setSearchResults([])
                   setSubcategories([])
                 }}
               >

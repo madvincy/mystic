@@ -2,6 +2,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useState, useEffect } from "react";
 import {
   Facebook,
@@ -46,15 +47,15 @@ const iconMap: Record<string, any> = {
 };
 
 interface SocialLink {
-  id: string
-  platform: string
-  url: string
-  icon: string
-  is_active: boolean
+  id: string;
+  platform: string;
+  url: string;
+  icon: string;
+  is_active: boolean;
 }
 
 export default function Footer() {
-  // ✅ ALL HOOKS AT THE TOP
+  // ✅ ALL HOOKS AT THE TOP FIRST
   const pathname = usePathname();
   const [email, setEmail] = useState("");
   const [isSubscribing, setIsSubscribing] = useState(false);
@@ -62,13 +63,21 @@ export default function Footer() {
   const [loading, setLoading] = useState(true);
   const [subscribed, setSubscribed] = useState(false);
 
-  // ✅ Early return AFTER all hooks have been called
-  if (pathname?.startsWith("/admin")) {
-    return null;
-  }
-
-  // ✅ Fetch social links from database
+  // ✅ Fetch social links from database - with caching
   useEffect(() => {
+    // ✅ Check if we have cached data
+    const cachedLinks = sessionStorage.getItem('socialLinks');
+    if (cachedLinks) {
+      try {
+        const parsed = JSON.parse(cachedLinks);
+        setSocialLinks(parsed);
+        setLoading(false);
+        return;
+      } catch (e) {
+        // If cache is invalid, continue to fetch
+      }
+    }
+
     const fetchSocialLinks = async () => {
       try {
         const { data, error } = await supabase
@@ -78,16 +87,45 @@ export default function Footer() {
           .order("created_at", { ascending: true });
 
         if (error) throw error;
-        setSocialLinks(data || []);
+        
+        const links = data || [];
+        setSocialLinks(links);
+        // ✅ Cache for 5 minutes
+        sessionStorage.setItem('socialLinks', JSON.stringify(links));
       } catch (error) {
         console.error("Error fetching social links:", error);
-        // Fallback to default links if database fails
-        setSocialLinks([
-          { id: "1", platform: "facebook", url: "https://facebook.com/mysticwines", icon: "Facebook", is_active: true },
-          { id: "2", platform: "twitter", url: "https://twitter.com/mysticwines", icon: "Twitter", is_active: true },
-          { id: "3", platform: "instagram", url: "https://instagram.com/mysticwines", icon: "Instagram", is_active: true },
-          { id: "4", platform: "youtube", url: "https://youtube.com/mysticwines", icon: "Youtube", is_active: true },
-        ]);
+        // ✅ Fallback links
+        const fallbackLinks = [
+          {
+            id: "1",
+            platform: "facebook",
+            url: "https://facebook.com/mysticwines",
+            icon: "Facebook",
+            is_active: true,
+          },
+          {
+            id: "2",
+            platform: "twitter",
+            url: "https://twitter.com/mysticwines",
+            icon: "Twitter",
+            is_active: true,
+          },
+          {
+            id: "3",
+            platform: "instagram",
+            url: "https://instagram.com/mysticwines",
+            icon: "Instagram",
+            is_active: true,
+          },
+          {
+            id: "4",
+            platform: "youtube",
+            url: "https://youtube.com/mysticwines",
+            icon: "Youtube",
+            is_active: true,
+          },
+        ];
+        setSocialLinks(fallbackLinks);
       } finally {
         setLoading(false);
       }
@@ -96,17 +134,15 @@ export default function Footer() {
     fetchSocialLinks();
   }, []);
 
-  // ✅ Newsletter subscription handler
+  // ✅ Newsletter subscription handler with proper Supabase integration
   const handleSubscribe = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Validate email
     if (!email) {
-      toast.error("Please enter your email address");
+      toast.error("Please enter your email");
       return;
     }
 
-    // Validate email format
+    // ✅ Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       toast.error("Please enter a valid email address");
@@ -114,34 +150,32 @@ export default function Footer() {
     }
 
     setIsSubscribing(true);
-
     try {
-      // Check if email already exists
+      // ✅ Check if email already exists
       const { data: existing, error: checkError } = await supabase
         .from("newsletter_subscribers")
         .select("id, email, status")
         .eq("email", email.toLowerCase().trim())
         .maybeSingle();
 
-      if (checkError && checkError.code !== 'PGRST116') {
+      if (checkError && checkError.code !== "PGRST116") {
         throw checkError;
       }
 
       if (existing) {
-        if (existing.status === 'active') {
-          toast.info("You're already subscribed to our newsletter! 🎉");
+        if (existing.status === "active") {
+          toast.info("You're already subscribed! 🎉");
           setSubscribed(true);
           setEmail("");
           return;
-        } else if (existing.status === 'unsubscribed') {
-          // Reactivate subscription
+        } else if (existing.status === "unsubscribed") {
           const { error: updateError } = await supabase
             .from("newsletter_subscribers")
             .update({
-              status: 'active',
+              status: "active",
               updated_at: new Date().toISOString(),
             })
-            .eq('id', existing.id);
+            .eq("id", existing.id);
 
           if (updateError) throw updateError;
           
@@ -152,41 +186,32 @@ export default function Footer() {
         }
       }
 
-      // Insert new subscriber
+      // ✅ Insert new subscriber
       const { error: insertError } = await supabase
         .from("newsletter_subscribers")
         .insert({
           email: email.toLowerCase().trim(),
-          status: 'active',
+          status: "active",
           subscribed_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          source: 'website_footer',
+          source: "footer_newsletter",
         });
 
-      if (insertError) throw insertError;
-
-      toast.success("Subscribed successfully! 🎉 Check your email for confirmation.");
-      setSubscribed(true);
-      setEmail("");
-
-      // Optional: Send confirmation email (you'd need an API endpoint for this)
-      // await fetch('/api/newsletter/confirm', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({ email }),
-      // });
-
-    } catch (error: any) {
-      console.error("Newsletter subscription error:", error);
-      
-      // Handle duplicate key error gracefully
-      if (error.code === '23505') {
-        toast.info("You're already subscribed to our newsletter! 🎉");
-        setSubscribed(true);
-        setEmail("");
-      } else {
-        toast.error(error.message || "Failed to subscribe. Please try again.");
+      if (insertError) {
+        if (insertError.code === "23505") {
+          toast.info("You're already subscribed! 🎉");
+          setSubscribed(true);
+          setEmail("");
+          return;
+        }
+        throw insertError;
       }
+
+      toast.success("Subscribed successfully! 🎉");
+      setEmail("");
+      setSubscribed(true);
+    } catch (error: any) {
+      console.error("Subscription error:", error);
+      toast.error(error.message || "Failed to subscribe. Please try again.");
     } finally {
       setIsSubscribing(false);
     }
@@ -224,6 +249,11 @@ export default function Footer() {
     return <Icon className="h-5 w-5" />;
   };
 
+  // ✅ EARLY RETURN AFTER ALL HOOKS HAVE BEEN CALLED
+  if (pathname?.startsWith("/admin")) {
+    return null;
+  }
+
   return (
     <footer className="bg-gray-900 dark:bg-gray-950 text-white mt-16 relative">
       {/* Back to Top Button */}
@@ -239,13 +269,30 @@ export default function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8">
           {/* Brand */}
           <div className="lg:col-span-1">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-r from-pink-600 to-purple-600 flex items-center justify-center text-white font-bold text-lg">
-                M
+            <div className="flex items-center gap-3 mb-4">
+              <div className="relative w-16 h-16 rounded-full overflow-hidden bg-gradient-to-r from-pink-600 to-purple-600 flex items-center justify-center flex-shrink-0">
+                <Image
+                  src="/images/logos/main-logo.png"
+                  alt="Mystic Liqour Store"
+                  width={100}
+                  height={100}
+                  className="object-cover"
+                  priority
+                />
               </div>
-              <span className="text-2xl font-bold bg-gradient-to-r from-pink-400 to-purple-400 bg-clip-text text-transparent">
-                MysticWines
-              </span>
+              <div className="flex flex-col">
+                <span className="text-xl font-display font-bold text-pink-600 dark:text-pink-400 tracking-wide">
+                  Mystic Store
+                </span>
+                <motion.span
+                  initial={{ opacity: 0, y: 5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3 }}
+                  className="text-xs font-serif font-light italic tracking-widest bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent"
+                >
+                  Drink Your Worth
+                </motion.span>
+              </div>
             </div>
             <p className="text-gray-400 text-sm mb-4">
               Premium wines & spirits delivered with care. Discover our
@@ -254,7 +301,10 @@ export default function Footer() {
             <div className="flex flex-wrap gap-3">
               {loading ? (
                 [...Array(4)].map((_, i) => (
-                  <div key={i} className="w-10 h-10 bg-gray-800 rounded-full animate-pulse" />
+                  <div
+                    key={i}
+                    className="w-10 h-10 bg-gray-800 rounded-full animate-pulse"
+                  />
                 ))
               ) : socialLinks.length > 0 ? (
                 socialLinks.map((social) => (

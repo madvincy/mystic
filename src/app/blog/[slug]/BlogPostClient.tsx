@@ -38,38 +38,44 @@ export default function BlogPostClient({ initialPost }: BlogPostClientProps) {
   const [liked, setLiked] = useState(false)
   const [bookmarked, setBookmarked] = useState(false)
   const [viewCounted, setViewCounted] = useState(false)
+  const [loadingRelated, setLoadingRelated] = useState(true)
 
-  // Fetch related posts and update view count
   useEffect(() => {
     const fetchRelatedAndUpdateViews = async () => {
       // Update view count (non-blocking)
-      if (!viewCounted) {
+      if (!viewCounted && post) {
         setViewCounted(true)
         supabase
           .from('blog_posts')
-          .update({ views: (initialPost.views || 0) + 1 })
-          .eq('id', initialPost.id)
+          .update({ views: (post.views || 0) + 1 })
+          .eq('id', post.id)
           .then(({ error }) => {
             if (error) console.error('Error updating view count:', error)
           })
       }
 
       // Fetch related posts
-      const { data: relatedData } = await supabase
-        .from('blog_posts')
-        .select('*')
-        .eq('status', 'published')
-        .neq('id', initialPost.id)
-        .order('published_at', { ascending: false })
-        .limit(3)
+      try {
+        const { data: relatedData } = await supabase
+          .from('blog_posts')
+          .select('*')
+          .eq('status', 'published')
+          .neq('id', post.id)
+          .order('published_at', { ascending: false })
+          .limit(3)
 
-      if (relatedData) {
-        setRelatedPosts(relatedData)
+        if (relatedData) {
+          setRelatedPosts(relatedData)
+        }
+      } catch (error) {
+        console.error('Error fetching related posts:', error)
+      } finally {
+        setLoadingRelated(false)
       }
     }
 
     fetchRelatedAndUpdateViews()
-  }, [initialPost.id, initialPost.views, viewCounted])
+  }, [post, viewCounted])
 
   const handleLike = () => {
     setLiked(!liked)

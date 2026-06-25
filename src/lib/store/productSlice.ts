@@ -9,7 +9,7 @@ export const fetchCategories = createAsyncThunk(
   'products/fetchCategories',
   async (_, { rejectWithValue }) => {
     try {
-      console.log('🔄 [productSlice] Fetching categories...')
+      // console.log('🔄 [productSlice] Fetching categories...')
       
       // ✅ Fetch from Supabase first to ensure we have the latest data with image_url
       const { data, error } = await supabase
@@ -18,26 +18,26 @@ export const fetchCategories = createAsyncThunk(
         .order('name', { ascending: true })
 
       if (error) {
-        console.error('❌ [productSlice] Categories fetch error:', error)
+        // console.error('❌ [productSlice] Categories fetch error:', error)
         throw error
       }
 
-      console.log('✅ [productSlice] Categories fetched from Supabase:', data?.length || 0)
-      console.log('📸 [productSlice] Sample category image_url:', data?.[0]?.image_url || 'No image_url found')
+      // console.log('✅ [productSlice] Categories fetched from Supabase:', data?.length || 0)
+      // console.log('📸 [productSlice] Sample category image_url:', data?.[0]?.image_url || 'No image_url found')
 
       // Cache categories in IndexedDB
       if (data && data.length > 0) {
         try {
           await batchSaveToCache('categories', data)
-          console.log('💾 [productSlice] Categories cached successfully')
+          // console.log('💾 [productSlice] Categories cached successfully')
         } catch (cacheError) {
-          console.warn('⚠️ [productSlice] Could not cache categories:', cacheError)
+          // console.warn('⚠️ [productSlice] Could not cache categories:', cacheError)
         }
       }
 
       return data || []
     } catch (error: any) {
-      console.error('❌ [productSlice] Categories fetch error:', error)
+      // console.error('❌ [productSlice] Categories fetch error:', error)
       
       // ✅ Fallback to cache if Supabase fails
       try {
@@ -45,12 +45,12 @@ export const fetchCategories = createAsyncThunk(
         if (db.objectStoreNames.contains('categories')) {
           const cached = await db.getAll('categories')
           if (cached && cached.length > 0) {
-            console.log('📦 [productSlice] Using cached categories as fallback:', cached.length)
+            // console.log('📦 [productSlice] Using cached categories as fallback:', cached.length)
             return cached
           }
         }
       } catch (cacheError) {
-        console.warn('⚠️ [productSlice] Could not read from cache:', cacheError)
+        // console.warn('⚠️ [productSlice] Could not read from cache:', cacheError)
       }
       
       return rejectWithValue(error.message)
@@ -71,7 +71,7 @@ export const fetchCategoryImages = createAsyncThunk(
       if (error) throw error
       return data || []
     } catch (error: any) {
-      console.error('❌ [productSlice] Category images fetch error:', error)
+      // console.error('❌ [productSlice] Category images fetch error:', error)
       return rejectWithValue(error.message)
     }
   }
@@ -82,7 +82,7 @@ export const fetchProducts = createAsyncThunk(
   'products/fetchProducts',
   async (_, { rejectWithValue }) => {
     try {
-      console.log('🔄 [productSlice] Starting fetchProducts...')
+      // console.log('🔄 [productSlice] Starting fetchProducts...')
       
       // Check IndexedDB first
       const db = await getDB()
@@ -94,11 +94,11 @@ export const fetchProducts = createAsyncThunk(
           cached = await db.getAll('products')
         }
       } catch (cacheError) {
-        console.warn('⚠️ [productSlice] Could not read from cache:', cacheError)
+        // console.warn('⚠️ [productSlice] Could not read from cache:', cacheError)
       }
       
       if (cached && cached.length > 0) {
-        console.log('📦 [productSlice] Products loaded from cache:', cached.length)
+        // console.log('📦 [productSlice] Products loaded from cache:', cached.length)
         
         // Try to get other data from cache
         let discounts = []
@@ -116,7 +116,7 @@ export const fetchProducts = createAsyncThunk(
             featured = await db.getAll('featured_products')
           }
         } catch (cacheError) {
-          console.warn('⚠️ [productSlice] Could not read related data from cache:', cacheError)
+          // console.warn('⚠️ [productSlice] Could not read related data from cache:', cacheError)
         }
         
         // Enrich cached products with discount/flash sale data
@@ -124,7 +124,7 @@ export const fetchProducts = createAsyncThunk(
         return { products: enriched, fromCache: true }
       }
 
-      console.log('🌐 [productSlice] Fetching from Supabase...')
+      // console.log('🌐 [productSlice] Fetching from Supabase...')
       
       // Fetch from Supabase with all related data
       const [productsRes, discountsRes, flashSalesRes, featuredRes] = await Promise.all([
@@ -164,11 +164,11 @@ export const fetchProducts = createAsyncThunk(
       ])
 
       if (productsRes.error) {
-        console.error('❌ [productSlice] Products fetch error:', productsRes.error)
+        // console.error('❌ [productSlice] Products fetch error:', productsRes.error)
         throw productsRes.error
       }
 
-      console.log('✅ [productSlice] Products fetched:', productsRes.data?.length || 0)
+      // console.log('✅ [productSlice] Products fetched:', productsRes.data?.length || 0)
 
       // Enrich products with discounts and flash sales
       const enriched = enrichProductsWithDiscounts(
@@ -187,12 +187,12 @@ export const fetchProducts = createAsyncThunk(
           batchSaveToCache('featured_products', featuredRes.data || [])
         ])
       } catch (cacheError) {
-        console.warn('⚠️ [productSlice] Could not cache data:', cacheError)
+        // console.warn('⚠️ [productSlice] Could not cache data:', cacheError)
       }
 
       return { products: enriched, fromCache: false }
     } catch (error: any) {
-      console.error('❌ [productSlice] Fetch error:', error)
+      // console.error('❌ [productSlice] Fetch error:', error)
       return rejectWithValue(error.message)
     }
   }
@@ -407,15 +407,15 @@ const productSlice = createSlice({
     builder
       // Fetch Categories
       .addCase(fetchCategories.pending, (state) => {
-        console.log('🔄 [productSlice] Categories fetch pending...')
+        // console.log('🔄 [productSlice] Categories fetch pending...')
       })
       .addCase(fetchCategories.fulfilled, (state, action) => {
         state.categories = action.payload || []
-        console.log('✅ [productSlice] Categories fetch fulfilled:', state.categories.length)
-        console.log('📸 [productSlice] First category image_url:', state.categories[0]?.image_url || 'No image_url')
+        // console.log('✅ [productSlice] Categories fetch fulfilled:', state.categories.length)
+        // console.log('📸 [productSlice] First category image_url:', state.categories[0]?.image_url || 'No image_url')
       })
       .addCase(fetchCategories.rejected, (state, action) => {
-        console.error('❌ [productSlice] Categories fetch rejected:', action.payload)
+        // console.error('❌ [productSlice] Categories fetch rejected:', action.payload)
         state.categories = []
       })
       
@@ -423,14 +423,14 @@ const productSlice = createSlice({
       .addCase(fetchProducts.pending, (state) => {
         state.loading = true
         state.error = null
-        console.log('🔄 [productSlice] Products fetch pending...')
+        // console.log('🔄 [productSlice] Products fetch pending...')
       })
       .addCase(fetchProducts.fulfilled, (state, action) => {
         state.loading = false
         state.products = action.payload.products || []
         state.fromCache = action.payload.fromCache || false
         
-        console.log('✅ [productSlice] Products fetch fulfilled, products:', state.products.length)
+        // console.log('✅ [productSlice] Products fetch fulfilled, products:', state.products.length)
         
         // Compute derived states
         state.featuredProducts = state.products
@@ -448,7 +448,7 @@ const productSlice = createSlice({
       .addCase(fetchProducts.rejected, (state, action) => {
         state.loading = false
         state.error = action.payload as string
-        console.error('❌ [productSlice] Products fetch rejected:', action.payload)
+        // console.error('❌ [productSlice] Products fetch rejected:', action.payload)
       })
 
       // Wishlist

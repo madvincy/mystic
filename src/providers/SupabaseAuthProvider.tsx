@@ -1,9 +1,10 @@
 // src/providers/SupabaseAuthProvider.tsx
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState, useRef } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { User } from "@supabase/supabase-js";
+import { adminCacheUtils } from "@/lib/admin-cache";
 
 interface AuthContextType {
   user: User | null;
@@ -39,77 +40,13 @@ export function SupabaseAuthProvider({
   const [user, setUser] = useState<User | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
+  
+  const isCheckingAdmin = useRef(false);
+  const lastCheckTime = useRef(0);
 
-  // ✅ Function to create or update user (UPSERT)
-  const upsertUser = async (user: User) => {
-    try {
-      const { data, error } = await supabase
-        .from('users')
-        .upsert({
-          id: user.id,
-          name: user.user_metadata?.name || user.email || "User",
-          email: user.email,
-          phone: user.user_metadata?.phone || "",
-          address: "",
-          city: "",
-          country: "Kenya",
-          is_admin: user.email === process.env.NEXT_PUBLIC_ADMIN_EMAIL,
-          is_banned: false,
-          updated_at: new Date().toISOString(),
-        }, {
-          onConflict: 'id', // ✅ Upsert by ID
-          ignoreDuplicates: false,
-        })
-        .select()
-        .maybeSingle();
-
-      if (error) {
-        // If ID conflict, try upsert by email
-        if (error.code === '23505') {
-          const { data: emailData, error: emailError } = await supabase
-            .from('users')
-            .upsert({
-              email: user.email,
-              name: user.user_metadata?.name || user.email || "User",
-              phone: user.user_metadata?.phone || "",
-              address: "",
-              city: "",
-              country: "Kenya",
-              is_admin: user.email === process.env.NEXT_PUBLIC_ADMIN_EMAIL,
-              is_banned: false,
-              updated_at: new Date().toISOString(),
-            }, {
-              onConflict: 'email', // ✅ Upsert by email
-              ignoreDuplicates: false,
-            })
-            .select()
-            .maybeSingle();
-          
-          if (emailError) {
-            console.error('❌ Error upserting by email:', emailError);
-          } else {
-            console.log('✅ User upserted by email:', emailData?.email);
-          }
-          return emailData;
-        }
-        
-        console.error('❌ Error upserting user:', error);
-        return null;
-      }
-
-      return data;
-      
-    } catch (error) {
-      console.error('❌ Error in upsertUser:', error);
-      return null;
-    }
-  };
-
-  // ✅ Simpler version: Check and create if not exists
+  // ✅ Create user if not exists
   const createUserIfNotExists = async (user: User) => {
     try {
-      
-      // First check if user exists
       const { data: existingUser, error: checkError } = await supabase
         .from('users')
         .select('id, email, is_admin')
@@ -122,12 +59,9 @@ export function SupabaseAuthProvider({
       }
 
       if (existingUser) {
-        setIsAdmin(existingUser.is_admin || false);
         return existingUser;
       }
 
-      // User doesn't exist, create them
-      
       const { data: newUser, error: insertError } = await supabase
         .from('users')
         .insert({
@@ -148,78 +82,96 @@ export function SupabaseAuthProvider({
 
       if (insertError) {
         console.error('❌ Error creating user:', insertError);
-        // If duplicate email, try to get the existing user
         if (insertError.code === '23505') {
           const { data: existing } = await supabase
             .from('users')
             .select('id, email, is_admin')
             .eq('email', user.email)
             .maybeSingle();
-          
-          if (existing) {
-            setIsAdmin(existing.is_admin || false);
-            return existing;
-          }
+          return existing;
         }
         return;
       }
-      setIsAdmin(newUser?.is_admin || false);
-      return newUser;
       
+      return newUser;
     } catch (error) {
       console.error('❌ Error in createUserIfNotExists:', error);
     }
   };
 
-  // src/providers/SupabaseAuthProvider.tsx
-const checkAdminStatus = async (userId: string) => {
-  try {    
-    // ✅ First check if we have a session
-    const { data: { session } } = await supabase.auth.getSession()
-    
-    if (!session) {
-      setIsAdmin(false)
-      return
+  // ✅ Check admin status with caching
+  const checkAdminStatus = async (userId: string) => {
+    // ✅ Check cache first
+    const cachedStatus = adminCacheUtils.get(userId);
+    if (cachedStatus !== null) {
+      setIsAdmin(cachedStatus);
+      return;
     }
 
-    // ✅ Try to get user data with explicit headers
-    const { data, error } = await supabase
-      .from('users')
-      .select('is_admin')
-      .eq('id', userId)
-      .maybeSingle()
+    // ✅ Prevent duplicate requests
+    if (isCheckingAdmin.current) {
+      return;
+    }
 
-    if (error) {
-      // ✅ Handle 406 error specifically
-      if (error.message?.includes('406')) {
-        // Try to create the user
-        const { data: userData } = await supabase.auth.getUser()
-        if (userData?.user) {
-          await createUserIfNotExists(userData.user)
-          // Retry the check
-          const { data: retryData } = await supabase
-            .from('users')
-            .select('is_admin')
-            .eq('id', userId)
-            .maybeSingle()
-          setIsAdmin(retryData?.is_admin || false)
-          return
-        }
-        setIsAdmin(false)
-        return
-      }
+    // ✅ Debounce
+    if (Date.now() - lastCheckTime.current < 2000) {
+      return;
+    }
+
+    isCheckingAdmin.current = true;
+    lastCheckTime.current = Date.now();
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
       
-      console.error('❌ Error checking admin status:', error)
-      setIsAdmin(false)
-      return
+      if (!session) {
+        setIsAdmin(false);
+        isCheckingAdmin.current = false;
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('users')
+        .select('is_admin')
+        .eq('id', userId)
+        .maybeSingle();
+
+      if (error) {
+        if (error.message?.includes('406')) {
+          const { data: userData } = await supabase.auth.getUser();
+          if (userData?.user) {
+            await createUserIfNotExists(userData.user);
+            const { data: retryData } = await supabase
+              .from('users')
+              .select('is_admin')
+              .eq('id', userId)
+              .maybeSingle();
+            
+            const adminStatus = retryData?.is_admin || false;
+            adminCacheUtils.set(userId, adminStatus);
+            setIsAdmin(adminStatus);
+            isCheckingAdmin.current = false;
+            return;
+          }
+        }
+        
+        console.error('❌ Error checking admin status:', error);
+        setIsAdmin(false);
+        isCheckingAdmin.current = false;
+        return;
+      }
+
+      const adminStatus = data?.is_admin || false;
+      adminCacheUtils.set(userId, adminStatus);
+      setIsAdmin(adminStatus);
+      
+    } catch (error) {
+      console.error('❌ Admin check error:', error);
+      setIsAdmin(false);
+    } finally {
+      isCheckingAdmin.current = false;
     }
-    setIsAdmin(data?.is_admin || false)
-    
-  } catch (error) {
-    console.error('❌ Admin check error:', error)
-    setIsAdmin(false)
-  }
-}
+  };
 
   const refreshUser = async () => {
     try {
@@ -243,45 +195,66 @@ const checkAdminStatus = async (userId: string) => {
     }
   };
 
+  // ✅ Initialize auth - only once
   useEffect(() => {
+    let isMounted = true;
+    let initDone = false;
+
     const initAuth = async () => {
+      if (initDone) return;
+      initDone = true;
+
       try {
         const { data: { session } } = await supabase.auth.getSession();
         
-        if (session?.user) {
+        if (session?.user && isMounted) {
           setUser(session.user);
           await createUserIfNotExists(session.user);
           await checkAdminStatus(session.user.id);
-        } else {
-          console.log('👤 No session found');
         }
       } catch (error) {
         console.error('❌ Auth init error:', error);
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
     initAuth();
 
+    // ✅ Auth state change handler with debouncing
+    let authTimeout: NodeJS.Timeout | null = null;
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (session?.user) {
-        setUser(session.user);
-        await createUserIfNotExists(session.user);
-        await checkAdminStatus(session.user.id);
-      } else {
-        setUser(null);
-        setIsAdmin(false);
+      if (authTimeout) {
+        clearTimeout(authTimeout);
+        authTimeout = null;
       }
-      setLoading(false);
+
+      authTimeout = setTimeout(async () => {
+        if (!isMounted) return;
+
+        if (session?.user) {
+          setUser(session.user);
+          await createUserIfNotExists(session.user);
+          await checkAdminStatus(session.user.id);
+        } else {
+          setUser(null);
+          setIsAdmin(false);
+          adminCacheUtils.clear();
+        }
+        setLoading(false);
+      }, 100);
     });
 
     return () => {
+      isMounted = false;
+      if (authTimeout) {
+        clearTimeout(authTimeout);
+      }
       subscription.unsubscribe();
     };
   }, []);
-
-  // ... rest of the signIn, signUp, signOut functions remain the same
 
   const signIn = async (email: string, password: string) => {
     try {
@@ -292,11 +265,10 @@ const checkAdminStatus = async (userId: string) => {
 
       if (error) throw error;
 
-      // ✅ Create user if doesn't exist after sign in
       if (data?.user) {
+        setUser(data.user);
         await createUserIfNotExists(data.user);
         await checkAdminStatus(data.user.id);
-        setUser(data.user);
       }
     } catch (error) {
       console.error("Sign in error:", error);
@@ -331,7 +303,6 @@ const checkAdminStatus = async (userId: string) => {
 
     if (error) throw error;
 
-    // Create user profile
     if (data.user) {
       const { error: insertError } = await supabase.from("users").insert({
         id: data.user.id,
@@ -359,6 +330,7 @@ const checkAdminStatus = async (userId: string) => {
     if (error) throw error;
     setUser(null);
     setIsAdmin(false);
+    adminCacheUtils.clear();
   };
 
   const resetPassword = async (email: string) => {

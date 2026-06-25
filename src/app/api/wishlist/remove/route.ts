@@ -1,18 +1,32 @@
 // src/app/api/wishlist/remove/route.ts
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase/client'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/app/api/auth/[...nextauth]/route'
+
+
 
 export async function DELETE(request: Request) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
+     const authHeader = request.headers.get('Authorization')
+    if (!authHeader) {
       return NextResponse.json(
         { success: false, error: 'Unauthorized' },
         { status: 401 }
       )
     }
+
+    // ✅ Extract the token
+    const token = authHeader.replace('Bearer ', '')
+    
+    // ✅ Get user from Supabase using the token
+    const { data: { user }, error: userError } = await supabase.auth.getUser(token)
+    
+    if (userError || !user) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized' },
+        { status: 401 }
+      )
+    }
+
 
     const { searchParams } = new URL(request.url)
     const productId = searchParams.get('productId')
@@ -28,7 +42,7 @@ export async function DELETE(request: Request) {
     let query = supabase
       .from('wishlist')
       .delete()
-      .eq('user_id', session.user.id)
+      .eq('user_id', user.id)
       .eq('product_id', productId)
 
     if (variantId) {

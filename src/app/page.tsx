@@ -1,235 +1,244 @@
 // src/app/page.tsx
-'use client'
+"use client";
 
-import { useState, useEffect } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
-import { motion } from 'framer-motion'
-import Image from 'next/image'
-import Link from 'next/link'
-import { 
-  fetchProducts, 
-  fetchCategories 
-} from '@/lib/store/productSlice'
-import { AppDispatch, RootState } from '@/lib/store'
-import AdSlider from '@/components/ui/AdSlider'
-import ProductGrid from '@/components/ui/ProductGrid'
-import { Button } from '@/components/shadCn/ui/button'
-import { 
-  ArrowRight, 
-  Sparkles, 
-  Flame, 
-  TrendingUp, 
+import { useState, useEffect } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { motion } from "framer-motion";
+import Image from "next/image";
+import Link from "next/link";
+import { fetchProducts, fetchCategories } from "@/lib/store/productSlice";
+import { AppDispatch, RootState } from "@/lib/store";
+import AdSlider from "@/components/ui/AdSlider";
+import ProductGrid from "@/components/ui/ProductGrid";
+import { Button } from "@/components/shadCn/ui/button";
+import {
+  ArrowRight,
+  Sparkles,
+  Flame,
+  TrendingUp,
   Clock,
   Calendar,
   User,
   BookOpen,
   Send,
   CheckCircle,
-  AlertCircle
-} from 'lucide-react'
-import { Card, CardContent } from '@/components/shadCn/ui/card'
-import { Badge } from '@/components/shadCn/ui/badge'
-import { Input } from '@/components/shadCn/ui/input'
-import { supabase } from '@/lib/supabase/client'
-import { toast } from 'sonner'
-import FlashSaleBanner from '@/components/ui/FlashSaleBanner'
+  AlertCircle,
+} from "lucide-react";
+import { Card, CardContent } from "@/components/shadCn/ui/card";
+import { Badge } from "@/components/shadCn/ui/badge";
+import { Input } from "@/components/shadCn/ui/input";
+import { supabase } from "@/lib/supabase/client";
+import { toast } from "sonner";
+import FlashSaleBanner from "@/components/ui/FlashSaleBanner";
 
 // ✅ Fallback image if category has no image
-const FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1506377247377-2a5b3b417ebb?q=80&w=1800&auto=format&fit=crop'
+const FALLBACK_IMAGE =
+  "https://images.unsplash.com/photo-1506377247377-2a5b3b417ebb?q=80&w=1800&auto=format&fit=crop";
 
-// ✅ Ad interface
+// ✅ Ad interface - updated to match database schema
 interface Advertisement {
-  id: string
-  title: string
-  description: string
-  image_url: string
-  link_url: string
-  cta_text: string
-  type: 'banner' | 'sidebar' | 'inline' | 'popup' | 'footer'
-  category_id: string | null
-  subcategory_id: string | null
-  placement: string
-  display_order: number
-  is_active: boolean
+  id: string;
+  title: string;
+  description: string;
+  image_url: string;
+  link_url: string;
+  cta_text: string;
+  type: "banner" | "sidebar" | "inline" | "popup" | "footer";
+  category_id: string | null;
+  subcategory_id: string | null;
+  placement: string;
+  order_position: number;
+  is_active: boolean;
+  start_date: string;
+  end_date: string;
+  clicks: number;
+  impressions: number;
 }
 
 // ✅ Blog Post interface
 interface BlogPost {
-  id: string
-  title: string
-  slug: string
-  excerpt: string
-  featured_image: string
-  published_at: string
-  reading_time: number
-  author_name: string
-  tags: string[]
+  id: string;
+  title: string;
+  slug: string;
+  excerpt: string;
+  featured_image: string;
+  published_at: string;
+  reading_time: number;
+  author_name: string;
+  tags: string[];
 }
 
 export default function Home() {
-  const dispatch = useDispatch<AppDispatch>()
-  const { 
-    products, 
-    loading, 
-    featuredProducts, 
+  const dispatch = useDispatch<AppDispatch>();
+  const {
+    products,
+    loading,
+    featuredProducts,
     discountedProducts,
     categories,
-    flashSales 
-  } = useSelector((state: RootState) => state.products)
-  
+    flashSales,
+  } = useSelector((state: RootState) => state.products);
+
   // ✅ State for ads and blog posts
-  const [advertisements, setAdvertisements] = useState<Advertisement[]>([])
-  const [recentBlogPosts, setRecentBlogPosts] = useState<BlogPost[]>([])
-  const [newsletterEmail, setNewsletterEmail] = useState('')
-  const [isSubscribing, setIsSubscribing] = useState(false)
-  const [subscribed, setSubscribed] = useState(false)
+  const [advertisements, setAdvertisements] = useState<Advertisement[]>([]);
+  const [recentBlogPosts, setRecentBlogPosts] = useState<BlogPost[]>([]);
+  const [newsletterEmail, setNewsletterEmail] = useState("");
+  const [isSubscribing, setIsSubscribing] = useState(false);
+  const [subscribed, setSubscribed] = useState(false);
 
   useEffect(() => {
-    dispatch(fetchProducts())
-    dispatch(fetchCategories())
-    fetchAdvertisements()
-    fetchRecentBlogPosts()
-  }, [dispatch])
+    dispatch(fetchProducts());
+    dispatch(fetchCategories());
+    fetchAdvertisements();
+    fetchRecentBlogPosts();
+  }, [dispatch]);
 
-  // ✅ Fetch advertisements
+  // ✅ Fetch advertisements - Fixed to include ads without end_date
   const fetchAdvertisements = async () => {
     try {
       const { data, error } = await supabase
-        .from('advertisements')
-        .select('*')
-        .eq('is_active', true)
-        .gte('end_date', new Date().toISOString())
-        .order('display_order', { ascending: true })
+        .from("advertisements")
+        .select("*")
+        .eq("is_active", true)
+        .order("order_position", { ascending: true });
 
-      if (error) throw error
-      setAdvertisements(data || [])
+      if (error) throw error;
+      
+      const now = new Date().toISOString();
+      const filteredData = data?.filter(ad => {
+        if (!ad.end_date) return true;
+        return ad.end_date >= now;
+      }) || [];
+      
+      setAdvertisements(filteredData);
     } catch (error) {
-      console.error('Error fetching advertisements:', error)
+      console.error("Error fetching advertisements:", error);
     }
-  }
+  };
 
   // ✅ Fetch recent blog posts
   const fetchRecentBlogPosts = async () => {
     try {
       const { data, error } = await supabase
-        .from('blog_posts')
-        .select('*')
-        .eq('status', 'published')
-        .order('published_at', { ascending: false })
-        .limit(3)
+        .from("blog_posts")
+        .select("*")
+        .eq("status", "published")
+        .order("published_at", { ascending: false })
+        .limit(3);
 
-      if (error) throw error
-      setRecentBlogPosts(data || [])
+      if (error) throw error;
+      setRecentBlogPosts(data || []);
     } catch (error) {
-      console.error('Error fetching blog posts:', error)
+      console.error("Error fetching blog posts:", error);
     }
-  }
+  };
 
   // ✅ Newsletter subscription handler
   const handleNewsletterSubscribe = async (e: React.FormEvent) => {
-    e.preventDefault()
-    
+    e.preventDefault();
+
     if (!newsletterEmail) {
-      toast.error('Please enter your email address')
-      return
+      toast.error("Please enter your email address");
+      return;
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(newsletterEmail)) {
-      toast.error('Please enter a valid email address')
-      return
+      toast.error("Please enter a valid email address");
+      return;
     }
 
-    setIsSubscribing(true)
+    setIsSubscribing(true);
 
     try {
       const { data: existing, error: checkError } = await supabase
-        .from('newsletter_subscribers')
-        .select('id, email, status')
-        .eq('email', newsletterEmail.toLowerCase().trim())
-        .maybeSingle()
+        .from("newsletter_subscribers")
+        .select("id, email, status")
+        .eq("email", newsletterEmail.toLowerCase().trim())
+        .maybeSingle();
 
-      if (checkError && checkError.code !== 'PGRST116') {
-        throw checkError
+      if (checkError && checkError.code !== "PGRST116") {
+        throw checkError;
       }
 
       if (existing) {
-        if (existing.status === 'active') {
-          toast.info("You're already subscribed! 🎉")
-          setSubscribed(true)
-          setNewsletterEmail('')
-          return
-        } else if (existing.status === 'unsubscribed') {
+        if (existing.status === "active") {
+          toast.info("You're already subscribed! 🎉");
+          setSubscribed(true);
+          setNewsletterEmail("");
+          return;
+        } else if (existing.status === "unsubscribed") {
           const { error: updateError } = await supabase
-            .from('newsletter_subscribers')
+            .from("newsletter_subscribers")
             .update({
-              status: 'active',
+              status: "active",
               updated_at: new Date().toISOString(),
             })
-            .eq('id', existing.id)
+            .eq("id", existing.id);
 
-          if (updateError) throw updateError
-          
-          toast.success("Welcome back! You've been resubscribed 🎉")
-          setSubscribed(true)
-          setNewsletterEmail('')
-          return
+          if (updateError) throw updateError;
+
+          toast.success("Welcome back! You've been resubscribed 🎉");
+          setSubscribed(true);
+          setNewsletterEmail("");
+          return;
         }
       }
 
       const { error: insertError } = await supabase
-        .from('newsletter_subscribers')
+        .from("newsletter_subscribers")
         .insert({
           email: newsletterEmail.toLowerCase().trim(),
-          status: 'active',
+          status: "active",
           subscribed_at: new Date().toISOString(),
-          source: 'homepage_newsletter',
-        })
+          source: "homepage_newsletter",
+        });
 
-      if (insertError) throw insertError
+      if (insertError) throw insertError;
 
-      toast.success("Subscribed successfully! 🎉")
-      setSubscribed(true)
-      setNewsletterEmail('')
-
+      toast.success("Subscribed successfully! 🎉");
+      setSubscribed(true);
+      setNewsletterEmail("");
     } catch (error: any) {
-      console.error('Newsletter subscription error:', error)
-      if (error.code === '23505') {
-        toast.info("You're already subscribed! 🎉")
-        setSubscribed(true)
-        setNewsletterEmail('')
+      console.error("Newsletter subscription error:", error);
+      if (error.code === "23505") {
+        toast.info("You're already subscribed! 🎉");
+        setSubscribed(true);
+        setNewsletterEmail("");
       } else {
-        toast.error(error.message || 'Failed to subscribe. Please try again.')
+        toast.error(error.message || "Failed to subscribe. Please try again.");
       }
     } finally {
-      setIsSubscribing(false)
+      setIsSubscribing(false);
     }
-  }
+  };
 
   // Get products with flash sales for timer display
-  const flashSaleProducts = products.filter(p => p.flash_sale).slice(0, 4)
-  const bestSellers = products.filter(p => p.is_bestseller).slice(0, 4)
-  const newArrivals = products.filter(p => p.is_new).slice(0, 4)
-  const featured = featuredProducts.slice(0, 4)
+  const flashSaleProducts = products.filter((p) => p.flash_sale).slice(0, 5);
+  const bestSellers = products.filter((p) => p.is_bestseller).slice(0, 5);
+  const newArrivals = products.filter((p) => p.is_new).slice(0, 5);
+  const featured = featuredProducts.slice(0, 5);
 
   // ✅ Prepare category data using database image_url
-  const categoryData = categories.slice(0, 6).map(cat => ({
+  const categoryData = categories.slice(0, 6).map((cat) => ({
     id: cat.id,
     name: cat.name,
     slug: cat.slug,
     image: cat.image_url || FALLBACK_IMAGE,
-    count: products.filter(p => p.category_id === cat.id).length
-  }))
+    count: products.filter((p) => p.category_id === cat.id).length,
+  }));
 
   // ✅ Get inline ads (for inserting between product rows)
-  const inlineAds = advertisements.filter(ad => ad.type === 'inline' && ad.placement === 'homepage')
+  const inlineAds = advertisements.filter(
+    (ad) => ad.type === "inline" && ad.placement === "homepage",
+  );
 
   return (
     <div className="min-h-screen">
       {/* Ad Slider */}
       <section className="container mx-auto mt-8">
         <AdSlider />
-      </section> 
+      </section>
 
       {/* Flash Sale Banner */}
       {flashSales.length > 0 && (
@@ -248,7 +257,10 @@ export default function Home() {
             </p>
           </div>
           <Link href="/products">
-            <Button variant="ghost" className="text-pink-600 hover:text-pink-700 group">
+            <Button
+              variant="ghost"
+              className="text-pink-600 hover:text-pink-700 group"
+            >
               View All Categories
               <ArrowRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-1" />
             </Button>
@@ -273,7 +285,7 @@ export default function Home() {
                     alt={category.name}
                     className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                     onError={(e) => {
-                      (e.target as HTMLImageElement).src = FALLBACK_IMAGE
+                      (e.target as HTMLImageElement).src = FALLBACK_IMAGE;
                     }}
                   />
                 </div>
@@ -292,9 +304,7 @@ export default function Home() {
                     </p>
                   </div>
 
-                  <motion.div
-                    className="w-8 h-8 bg-white rounded-full flex items-center justify-center text-black opacity-0 -translate-y-4 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 ease-out"
-                  >
+                  <motion.div className="w-8 h-8 bg-white rounded-full flex items-center justify-center text-black opacity-0 -translate-y-4 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 ease-out">
                     <ArrowRight className="w-4 h-4" strokeWidth={2} />
                   </motion.div>
                 </div>
@@ -304,24 +314,48 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Featured Products */}
+      {/* ✅ Featured Products - columns={5} */}
       {featured.length > 0 && (
         <section className="container mx-auto px-4 mt-12">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-2">
               <Sparkles className="h-5 w-5 text-pink-600" />
-              <h2 className="text-xl md:text-2xl font-bold">Featured Products</h2>
+              <h2 className="text-xl md:text-2xl font-bold">
+                Featured Products
+              </h2>
             </div>
             <Link href="/products?featured=true">
-              <Button variant="ghost" size="sm" className="text-pink-600 hover:text-pink-700 group">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-pink-600 hover:text-pink-700 group"
+              >
                 View All
                 <ArrowRight className="ml-1 h-4 w-4 group-hover:translate-x-1 transition" />
               </Button>
             </Link>
           </div>
-          <ProductGrid products={featured} loading={loading} showDiscountBadge />
+          <ProductGrid
+            products={featured}
+            loading={loading}
+            showDiscountBadge
+            columns={5} // ✅ Changed from 4 to 5
+          />
         </section>
       )}
+
+      {/* ✅ Wine Category Section - columns={5} */}
+      <section className="container mx-auto px-4 mt-12">
+        <ProductGrid
+          products={products}
+          loading={loading}
+          showDiscountBadge
+          categoryFilter="wine"
+          title="🍷 Premium Wines"
+          viewAllLink="/products?category=wine"
+          columns={5} // ✅ Changed from 4 to 5
+        />
+      </section>
 
       {/* ✅ Inline Ad - After Featured Products */}
       {inlineAds.length > 0 && (
@@ -333,7 +367,7 @@ export default function Home() {
               animate={{ opacity: 1, y: 0 }}
               className="relative overflow-hidden rounded-2xl"
             >
-              <Link href={ad.link_url || '#'} target="_blank">
+              <Link href={ad.link_url || "#"} target="_blank">
                 <div className="relative aspect-[21/9] md:aspect-[21/6]">
                   <img
                     src={ad.image_url}
@@ -354,7 +388,7 @@ export default function Home() {
                         </p>
                       )}
                       <Button className="bg-white text-pink-600 hover:bg-white/90">
-                        {ad.cta_text || 'Learn More'}
+                        {ad.cta_text || "Learn More"}
                         <ArrowRight className="ml-2 h-4 w-4" />
                       </Button>
                     </div>
@@ -366,7 +400,33 @@ export default function Home() {
         </section>
       )}
 
-      {/* Flash Sale Products */}
+      {/* ✅ Whiskey Subcategory Section - columns={5} */}
+      <section className="container mx-auto px-4 mt-12">
+        <ProductGrid
+          products={products}
+          loading={loading}
+          showDiscountBadge
+          subcategoryFilter="whiskey"
+          title="🥃 Whiskey Collection"
+          viewAllLink="/products?subcategory=whiskey"
+          columns={5} // ✅ Changed from 4 to 5
+        />
+      </section>
+
+      {/* ✅ Spirits Category Section - columns={5} */}
+      <section className="container mx-auto px-4 mt-12">
+        <ProductGrid
+          products={products}
+          loading={loading}
+          showDiscountBadge
+          categoryFilter="spirits"
+          title="🥂 Premium Spirits"
+          viewAllLink="/products?category=spirits"
+          columns={5} // ✅ Changed from 4 to 5
+        />
+      </section>
+
+      {/* ✅ Flash Sale Products - columns={5} */}
       {flashSaleProducts.length > 0 && (
         <section className="container mx-auto px-4 mt-12">
           <div className="flex items-center justify-between mb-6">
@@ -376,22 +436,27 @@ export default function Home() {
               <Clock className="h-4 w-4 text-red-500 ml-2" />
             </div>
             <Link href="/products?flash-sale=true">
-              <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-600 group">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-red-500 hover:text-red-600 group"
+              >
                 View All
                 <ArrowRight className="ml-1 h-4 w-4 group-hover:translate-x-1 transition" />
               </Button>
             </Link>
           </div>
-          <ProductGrid 
-            products={flashSaleProducts} 
+          <ProductGrid
+            products={flashSaleProducts}
             loading={loading}
             showDiscountBadge
             showTimer
+            columns={5} // ✅ Changed from 4 to 5
           />
         </section>
       )}
 
-      {/* Best Sellers */}
+      {/* ✅ Best Sellers - columns={5} */}
       {bestSellers.length > 0 && (
         <section className="container mx-auto px-4 mt-12">
           <div className="flex items-center justify-between mb-6">
@@ -400,13 +465,22 @@ export default function Home() {
               <h2 className="text-xl md:text-2xl font-bold">Best Sellers</h2>
             </div>
             <Link href="/products?bestseller=true">
-              <Button variant="ghost" size="sm" className="text-pink-600 hover:text-pink-700 group">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-pink-600 hover:text-pink-700 group"
+              >
                 View All
                 <ArrowRight className="ml-1 h-4 w-4 group-hover:translate-x-1 transition" />
               </Button>
             </Link>
           </div>
-          <ProductGrid products={bestSellers} loading={loading} showDiscountBadge />
+          <ProductGrid
+            products={bestSellers}
+            loading={loading}
+            showDiscountBadge
+            columns={5} // ✅ Changed from 4 to 5
+          />
         </section>
       )}
 
@@ -420,7 +494,7 @@ export default function Home() {
               animate={{ opacity: 1, y: 0 }}
               className="relative overflow-hidden rounded-2xl"
             >
-              <Link href={ad.link_url || '#'} target="_blank">
+              <Link href={ad.link_url || "#"} target="_blank">
                 <div className="relative aspect-[21/9] md:aspect-[21/5]">
                   <img
                     src={ad.image_url}
@@ -441,7 +515,7 @@ export default function Home() {
                         </p>
                       )}
                       <Button className="bg-white text-purple-600 hover:bg-white/90">
-                        {ad.cta_text || 'Learn More'}
+                        {ad.cta_text || "Learn More"}
                         <ArrowRight className="ml-2 h-4 w-4" />
                       </Button>
                     </div>
@@ -453,7 +527,7 @@ export default function Home() {
         </section>
       )}
 
-      {/* Discounted Products */}
+      {/* ✅ Discounted Products - columns={5} */}
       {discountedProducts.length > 0 && (
         <section className="container mx-auto px-4 mt-12">
           <div className="flex items-center justify-between mb-6">
@@ -462,16 +536,21 @@ export default function Home() {
               <h2 className="text-xl md:text-2xl font-bold">Special Offers</h2>
             </div>
             <Link href="/products?on-sale=true">
-              <Button variant="ghost" size="sm" className="text-pink-600 hover:text-pink-700 group">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-pink-600 hover:text-pink-700 group"
+              >
                 View All
                 <ArrowRight className="ml-1 h-4 w-4 group-hover:translate-x-1 transition" />
               </Button>
             </Link>
           </div>
-          <ProductGrid 
-            products={discountedProducts.slice(0, 4)} 
+          <ProductGrid
+            products={discountedProducts.slice(0, 5)} // ✅ Changed to 5
             loading={loading}
             showDiscountBadge
+            columns={5} // ✅ Changed from 4 to 5
           />
         </section>
       )}
@@ -479,15 +558,22 @@ export default function Home() {
       {/* ✅ Blog Section */}
       {recentBlogPosts.length > 0 && (
         <section className="container mx-auto px-4 mt-16">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-2">
-              <BookOpen className="h-6 w-6 text-pink-600" />
-              <h2 className="text-2xl font-bold">Latest from Our Blog</h2>
+          <div className="relative flex items-center justify-center mb-10">
+            <div className="flex items-center gap-3">
+              <BookOpen className="h-7 w-7 text-pink-600" />
+              <h2 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent">
+                Latest from Our Blog
+              </h2>
+              <BookOpen className="h-7 w-7 text-purple-600" />
             </div>
-            <Link href="/blog">
-              <Button variant="ghost" size="sm" className="text-pink-600 hover:text-pink-700 group">
+            <Link href="/blog" className="absolute right-0">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-pink-600 hover:text-pink-700 group font-medium"
+              >
                 View All
-                <ArrowRight className="ml-1 h-4 w-4 group-hover:translate-x-1 transition" />
+                <ArrowRight className="ml-1 h-4 w-4 group-hover:translate-x-1 transition-transform" />
               </Button>
             </Link>
           </div>
@@ -539,7 +625,7 @@ export default function Home() {
                       <div className="flex items-center justify-between mt-3">
                         <span className="text-sm text-gray-500 flex items-center gap-1">
                           <User className="h-3 w-3" />
-                          {post.author_name || 'Admin'}
+                          {post.author_name || "Admin"}
                         </span>
                         <span className="text-sm text-pink-600 font-medium group-hover:translate-x-1 transition-transform inline-flex items-center gap-1">
                           Read More
@@ -555,14 +641,20 @@ export default function Home() {
         </section>
       )}
 
-      {/* ✅ Newsletter Section - Fixed Subscription */}
+      {/* ✅ Newsletter Section */}
       <section className="container mx-auto px-4 mt-16 mb-8">
         <div className="bg-gradient-to-r from-pink-600 to-purple-600 rounded-2xl p-8 md:p-12 text-center text-white">
-          <h2 className="text-2xl md:text-3xl font-bold mb-3">Join Our Newsletter</h2>
+          <h2 className="text-2xl md:text-3xl font-bold mb-3">
+            Join Our Newsletter
+          </h2>
           <p className="text-white/80 max-w-xl mx-auto mb-6">
-            Get the latest updates on new arrivals, exclusive offers, and special events.
+            Get the latest updates on new arrivals, exclusive offers, and
+            special events.
           </p>
-          <form onSubmit={handleNewsletterSubscribe} className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto">
+          <form
+            onSubmit={handleNewsletterSubscribe}
+            className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto"
+          >
             <div className="relative flex-1">
               <input
                 type="email"
@@ -577,8 +669,8 @@ export default function Home() {
                 <CheckCircle className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-green-400" />
               )}
             </div>
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               className="bg-white text-pink-600 hover:bg-white/90 font-semibold px-6 py-3 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={isSubscribing || subscribed}
             >
@@ -607,11 +699,12 @@ export default function Home() {
             </p>
           ) : (
             <p className="text-xs text-white/60 mt-4">
-              By subscribing, you agree to receive marketing emails. Unsubscribe anytime.
+              By subscribing, you agree to receive marketing emails. Unsubscribe
+              anytime.
             </p>
           )}
         </div>
       </section>
     </div>
-  )
+  );
 }

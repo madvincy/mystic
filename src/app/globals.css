@@ -81,7 +81,13 @@
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 212.7 26.8% 83.9%;
+
+    /* Mystic Wines Dark Mode Colors */
+    --mystic-pink: 340 82% 52%;
+    --mystic-pink-light: 340 82% 92%;
+    --mystic-purple: 270 80% 50%;
   }
+
   * {
     @apply border-border outline-ring/50;
   }
@@ -360,6 +366,234 @@
   top: 0;
 }
 
+/* ============================================
+   FIX: NAV DROPDOWN VISIBILITY IN DARK MODE
+   ============================================ */
+
+.dropdown-menu {
+  background-color: hsl(var(--background));
+  border: 1px solid hsl(var(--border));
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+}
+
+.dark .dropdown-menu {
+  background-color: hsl(222.2 84% 8%);
+  border-color: hsl(217.2 32.6% 25%);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+}
+
+.dropdown-item:hover {
+  background-color: hsl(var(--mystic-pink) / 0.1);
+  color: hsl(var(--mystic-pink));
+}
+
+.dark .dropdown-item:hover {
+  background-color: hsl(var(--mystic-pink) / 0.2);
+  color: hsl(var(--mystic-pink));
+}
+
+nav .dropdown-content,
+nav .dropdown-menu {
+  background-color: hsl(var(--background));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  padding: 0.5rem 0;
+  min-width: 200px;
+}
+
+.dark nav .dropdown-content,
+.dark nav .dropdown-menu {
+  background-color: hsl(222.2 84% 10%);
+  border-color: hsl(217.2 32.6% 25%);
+}
+
+nav .dropdown-content a,
+nav .dropdown-menu a {
+  color: hsl(var(--foreground));
+  padding: 0.5rem 1rem;
+  display: block;
+  transition: all 0.2s ease;
+}
+
+.dark nav .dropdown-content a,
+.dark nav .dropdown-menu a {
+  color: hsl(210 40% 90%);
+}
+
+nav .dropdown-content a:hover,
+nav .dropdown-menu a:hover {
+  background-color: hsl(var(--mystic-pink) / 0.1);
+  color: hsl(var(--mystic-pink));
+}
+
+.dark nav .dropdown-content a:hover,
+.dark nav .dropdown-menu a:hover {
+  background-color: hsl(var(--mystic-pink) / 0.2);
+  color: hsl(var(--mystic-pink));
+}
+
+/* ============================================
+   FIX: PRODUCT CARD VISIBILITY IN DARK MODE
+   ============================================ */
+
+.product-card {
+  background-color: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  transition: all 0.3s ease;
+}
+
+.dark .product-card {
+  background-color: hsl(222.2 84% 8%);
+  border-color: hsl(217.2 32.6% 20%);
+}
+
+.dark .product-card:hover {
+  border-color: hsl(var(--mystic-pink));
+  box-shadow: 0 8px 30px rgba(236, 72, 153, 0.15);
+}
+
+.product-card .image-container {
+  background-color: hsl(0 0% 95%);
+  border-radius: var(--radius) var(--radius) 0 0;
+}
+
+.dark .product-card .image-container {
+  background-color: hsl(222.2 84% 6%);
+}
+
+.product-card .product-title {
+  color: hsl(var(--foreground));
+}
+
+.dark .product-card .product-title {
+  color: hsl(210 40% 98%);
+}
+
+.product-card .product-price {
+  color: hsl(var(--mystic-pink));
+}
+
+.dark .product-card .product-price {
+  color: hsl(var(--mystic-pink));
+}
+
+.product-card .product-description {
+  color: hsl(var(--muted-foreground));
+}
+
+.dark .product-card .product-description {
+  color: hsl(215 20.2% 70%);
+}
+
+.products-grid .product-card {
+  background-color: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+}
+
+.dark .products-grid .product-card {
+  background-color: hsl(222.2 84% 10%);
+  border-color: hsl(217.2 32.6% 20%);
+}
+
+.dark .product-card {
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+
+.dark .product-card:hover {
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+}
+
+/* ============================================
+   FIX: CARD COMPONENT VISIBILITY
+   ============================================ */
+
+.card {
+  background-color: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+}
+
+.dark .card {
+  background-color: hsl(222.2 84% 8%);
+  border-color: hsl(217.2 32.6% 20%);
+}
+
+.dark .card:hover {
+  border-color: hsl(217.2 32.6% 30%);
+}
+
+/* ============================================
+   FIX: MODAL/DROPDOWN OVERLAY
+   ============================================ */
+
+.overlay,
+.popover-content {
+  background-color: hsl(var(--background));
+  border: 1px solid hsl(var(--border));
+}
+
+.dark .overlay,
+.dark .popover-content {
+  background-color: hsl(222.2 84% 10%);
+  border-color: hsl(217.2 32.6% 25%);
+}
+
+/* ============================================
+   SHADCN UI OVERRIDES FOR DARK MODE
+   ============================================ */
+
+[role="dialog"],
+[role="menu"],
+[role="listbox"] {
+  background-color: hsl(var(--background));
+}
+
+.dark [role="dialog"],
+.dark [role="menu"],
+.dark [role="listbox"] {
+  background-color: hsl(222.2 84% 10%);
+}
+
+[data-radix-popper-content-wrapper] {
+  background-color: hsl(var(--background));
+}
+
+.dark [data-radix-popper-content-wrapper] {
+  background-color: hsl(222.2 84% 10%);
+}
+
+[cmdk-root] {
+  background-color: hsl(var(--background));
+}
+
+.dark [cmdk-root] {
+  background-color: hsl(222.2 84% 10%);
+}
+
+/* ============================================
+   THEME TOGGLE STYLES
+   ============================================ */
+
+.theme-toggle {
+  background: hsl(var(--muted));
+  border-radius: 9999px;
+  padding: 0.25rem;
+  transition: background-color 0.3s ease;
+}
+
+.theme-toggle:hover {
+  background: hsl(var(--mystic-pink-light));
+}
+
+.dark .theme-toggle:hover {
+  background: hsl(340 82% 20%);
+}
+
+/* ============================================
+   THEME INLINE TOKENS
+   ============================================ */
+
 @theme inline {
   --font-heading: var(--font-sans);
   --font-sans: var(--font-sans);
@@ -403,6 +637,7 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/* oklch token overrides (shadcn v2 defaults) */
 :root {
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
@@ -470,4 +705,68 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+}
+
+/* ============================================
+   FIX: DIALOG BACKGROUND VISIBILITY
+   ============================================ */
+
+[data-radix-popper-content-wrapper] {
+  background-color: hsl(var(--background)) !important;
+}
+
+.dark [data-radix-popper-content-wrapper] {
+  background-color: hsl(222.2 84% 10%) !important;
+}
+
+[data-radix-dialog-content] {
+  background-color: hsl(var(--background)) !important;
+  border: 1px solid hsl(var(--border)) !important;
+}
+
+.dark [data-radix-dialog-content] {
+  background-color: hsl(222.2 84% 10%) !important;
+  border-color: hsl(217.2 32.6% 25%) !important;
+}
+
+[data-radix-dialog-overlay] {
+  background-color: rgba(0, 0, 0, 0.5) !important;
+  backdrop-filter: blur(4px) !important;
+}
+
+.dark [data-radix-dialog-overlay] {
+  background-color: rgba(0, 0, 0, 0.7) !important;
+}
+
+[data-state="open"][data-radix-dialog-content] {
+  background-color: hsl(var(--background)) !important;
+}
+
+.dark [data-state="open"][data-radix-dialog-content] {
+  background-color: hsl(222.2 84% 10%) !important;
+}
+
+/* NOTE: Removed the rule that forced transparent background on
+   [data-radix-dialog-content] > div and > div > div — it was
+   stripping card backgrounds inside dialogs on light theme. */
+
+div[role="dialog"] {
+  background-color: hsl(var(--background)) !important;
+  border: 1px solid hsl(var(--border)) !important;
+}
+
+.dark div[role="dialog"] {
+  background-color: hsl(222.2 84% 10%) !important;
+  border-color: hsl(217.2 32.6% 25%) !important;
+}
+
+/* Fix for AlertDialog */
+[data-radix-alert-dialog-content] {
+  background-color: hsl(var(--background)) !important;
+  border: 1px solid hsl(var(--border)) !important;
+}
+
+.dark [data-radix-alert-dialog-content] {
+  background-color: hsl(222.2 84% 10%) !important;
+  border-color: hsl(217.2 32.6% 25%) !important;
 }

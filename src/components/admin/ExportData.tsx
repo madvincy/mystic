@@ -32,6 +32,23 @@ interface ExportConfig {
   includeHeaders: boolean
 }
 
+// ✅ Define the analytics data type
+interface AnalyticsData {
+  summary: {
+    totalRevenue: number
+    totalOrders: number
+    totalUsers: number
+    totalProducts: number
+    averageOrderValue: number
+  }
+  orders: any[]
+  users: any[]
+  products: any[]
+}
+
+// ✅ Define a union type for the exported data
+type ExportedData = any[] | AnalyticsData
+
 export default function ExportData() {
   const [config, setConfig] = useState<ExportConfig>({
     type: 'products',
@@ -41,7 +58,7 @@ export default function ExportData() {
   })
   const [exporting, setExporting] = useState(false)
   const [progress, setProgress] = useState(0)
-  const [exportedData, setExportedData] = useState<any>(null)
+  const [exportedData, setExportedData] = useState<ExportedData | null>(null)
 
   const exportOptions = [
     { value: 'products', label: 'Products', icon: Package },
@@ -77,7 +94,7 @@ export default function ExportData() {
     setExportedData(null)
 
     try {
-      let data: any[] = []
+      let data: ExportedData = []
       let count = 0
       const dateFilter = getDateRangeFilter()
 
@@ -158,6 +175,7 @@ export default function ExportData() {
             supabase.from('products').select('price, stock_status, is_featured, created_at'),
           ])
 
+          // ✅ Correctly assign as AnalyticsData object
           data = {
             summary: {
               totalRevenue: ordersData.data?.reduce((sum, o) => sum + o.total_amount, 0) || 0,
@@ -179,19 +197,8 @@ export default function ExportData() {
 
       setProgress(90)
 
-      // Format data for export
-      let exportData = data
-      if (config.type === 'analytics') {
-        exportData = data
-      }
-
-      setExportedData({
-        data: exportData,
-        count,
-        type: config.type,
-        format: config.format,
-        exportedAt: new Date().toISOString(),
-      })
+      // ✅ Store the exported data
+      setExportedData(data)
 
       setProgress(100)
       toast.success(`Exported ${count} ${config.type} successfully`)
@@ -200,6 +207,16 @@ export default function ExportData() {
     } finally {
       setExporting(false)
     }
+  }
+
+  // ✅ Helper to check if data is an array
+  const isArrayData = (data: ExportedData): data is any[] => {
+    return Array.isArray(data)
+  }
+
+  // ✅ Helper to check if data is analytics
+  const isAnalyticsData = (data: ExportedData): data is AnalyticsData => {
+    return !Array.isArray(data) && data !== null && 'summary' in data
   }
 
   const downloadData = () => {
@@ -214,17 +231,20 @@ export default function ExportData() {
         mimeType = 'text/csv'
         filename += '.csv'
         // Convert to CSV
-        const items = Array.isArray(exportedData.data) ? exportedData.data : [exportedData.data]
+        const items = isArrayData(exportedData) ? exportedData : [exportedData]
         if (items.length > 0) {
           const headers = Object.keys(items[0])
           const rows = [
             headers.join(','),
             ...items.map(item => 
-              headers.map(header => 
-                typeof item[header] === 'object' 
-                  ? `"${JSON.stringify(item[header]).replace(/"/g, '""')}"` 
-                  : `"${String(item[header] || '').replace(/"/g, '""')}"`
-              ).join(',')
+              headers.map(header => {
+                const value = item[header]
+                if (value === null || value === undefined) return '""'
+                if (typeof value === 'object') {
+                  return `"${JSON.stringify(value).replace(/"/g, '""')}"`
+                }
+                return `"${String(value).replace(/"/g, '""')}"`
+              }).join(',')
             )
           ]
           content = rows.join('\n')
@@ -234,24 +254,26 @@ export default function ExportData() {
       case 'json':
         mimeType = 'application/json'
         filename += '.json'
-        content = JSON.stringify(exportedData.data, null, 2)
+        content = JSON.stringify(exportedData, null, 2)
         break
 
       case 'excel':
         mimeType = 'application/vnd.ms-excel'
-        filename += '.csv' // Excel can open CSV
-        // Same as CSV for simplicity
-        const excelItems = Array.isArray(exportedData.data) ? exportedData.data : [exportedData.data]
+        filename += '.csv'
+        const excelItems = isArrayData(exportedData) ? exportedData : [exportedData]
         if (excelItems.length > 0) {
           const headers = Object.keys(excelItems[0])
           const rows = [
             headers.join(','),
             ...excelItems.map(item => 
-              headers.map(header => 
-                typeof item[header] === 'object' 
-                  ? `"${JSON.stringify(item[header]).replace(/"/g, '""')}"` 
-                  : `"${String(item[header] || '').replace(/"/g, '""')}"`
-              ).join(',')
+              headers.map(header => {
+                const value = item[header]
+                if (value === null || value === undefined) return '""'
+                if (typeof value === 'object') {
+                  return `"${JSON.stringify(value).replace(/"/g, '""')}"`
+                }
+                return `"${String(value).replace(/"/g, '""')}"`
+              }).join(',')
             )
           ]
           content = rows.join('\n')
@@ -267,6 +289,18 @@ export default function ExportData() {
     a.click()
     window.URL.revokeObjectURL(url)
     toast.success('File downloaded successfully')
+  }
+
+  // ✅ Get the count for display
+  const getRecordCount = () => {
+    if (!exportedData) return 0
+    if (isArrayData(exportedData)) {
+      return exportedData.length
+    }
+    if (isAnalyticsData(exportedData)) {
+      return exportedData.orders.length + exportedData.users.length + exportedData.products.length
+    }
+    return 0
   }
 
   return (
@@ -422,21 +456,21 @@ export default function ExportData() {
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-3 gap-4">
                   <div className="text-center p-3 bg-gray-50 dark:bg-gray-900 rounded">
-                    <p className="text-2xl font-bold">{exportedData.count}</p>
+                    <p className="text-2xl font-bold">{getRecordCount()}</p>
                     <p className="text-sm text-gray-500">Records</p>
                   </div>
                   <div className="text-center p-3 bg-blue-50 dark:bg-blue-900/20 rounded">
-                    <p className="text-2xl font-bold uppercase">{exportedData.type}</p>
+                    <p className="text-2xl font-bold uppercase">{config.type}</p>
                     <p className="text-sm text-gray-500">Type</p>
                   </div>
                   <div className="text-center p-3 bg-purple-50 dark:bg-purple-900/20 rounded">
-                    <p className="text-2xl font-bold uppercase">{exportedData.format}</p>
+                    <p className="text-2xl font-bold uppercase">{config.format}</p>
                     <p className="text-sm text-gray-500">Format</p>
                   </div>
                 </div>
 
                 <div className="text-sm text-gray-500">
-                  Exported at: {new Date(exportedData.exportedAt).toLocaleString()}
+                  Exported at: {new Date().toLocaleString()}
                 </div>
 
                 <Button

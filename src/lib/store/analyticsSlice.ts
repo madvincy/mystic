@@ -16,7 +16,7 @@ export const fetchDashboardAnalytics = createAsyncThunk(
       const startDate = thirtyDaysAgo.toISOString()
       const endDate = now.toISOString()
 
-      // 1. Get total orders
+      // 1. Get total orders - ✅ Fix: handle null
       const { count: totalOrders, error: ordersError } = await supabase
         .from('orders')
         .select('*', { count: 'exact', head: true })
@@ -33,14 +33,14 @@ export const fetchDashboardAnalytics = createAsyncThunk(
 
       const totalRevenue = revenueData?.reduce((sum, order) => sum + order.total_amount, 0) || 0
 
-      // 3. Get total users
+      // 3. Get total users - ✅ Fix: handle null
       const { count: totalUsers, error: usersError } = await supabase
         .from('users')
         .select('*', { count: 'exact', head: true })
 
       if (usersError) throw usersError
 
-      // 4. Get total products
+      // 4. Get total products - ✅ Fix: handle null
       const { count: totalProducts, error: productsError } = await supabase
         .from('products')
         .select('*', { count: 'exact', head: true })
@@ -128,13 +128,18 @@ export const fetchDashboardAnalytics = createAsyncThunk(
         statusCount[order.status] = (statusCount[order.status] || 0) + 1
       })
 
+      // ✅ Fix: Ensure all values are numbers, not null
+      const safeTotalOrders = totalOrders || 0
+      const safeTotalUsers = totalUsers || 0
+      const safeTotalProducts = totalProducts || 0
+
       return {
         summary: {
-          totalOrders: totalOrders || 0,
+          totalOrders: safeTotalOrders,
           totalRevenue,
-          totalUsers: totalUsers || 0,
-          totalProducts: totalProducts || 0,
-          averageOrderValue: totalOrders > 0 ? totalRevenue / totalOrders : 0,
+          totalUsers: safeTotalUsers,
+          totalProducts: safeTotalProducts,
+          averageOrderValue: safeTotalOrders > 0 ? totalRevenue / safeTotalOrders : 0,
         },
         recentOrders: recentOrders || [],
         dailySales: dailyData,
@@ -357,10 +362,14 @@ export const fetchCustomerAnalytics = createAsyncThunk(
       const totalSpent = customers.reduce((sum, c) => sum + c.total_spent, 0)
       const avgSpentPerCustomer = customers.length > 0 ? totalSpent / customers.length : 0
 
+      // ✅ Fix: ensure values are numbers
+      const safeTotalCustomers = totalCustomers || 0
+      const safeNewCustomers = newCustomers || 0
+
       return {
         summary: {
-          totalCustomers: totalCustomers || 0,
-          newCustomers: newCustomers || 0,
+          totalCustomers: safeTotalCustomers,
+          newCustomers: safeNewCustomers,
           avgSpentPerCustomer,
           totalSpent,
           customerCount: customers.length,

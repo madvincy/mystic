@@ -1,7 +1,7 @@
 // src/components/admin/FeaturedProducts.tsx
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { 
   Search, 
@@ -13,14 +13,15 @@ import {
   RefreshCw,
   MoveUp,
   MoveDown,
-  Package
+  Package,
+  X
 } from 'lucide-react'
 import { Button } from '@/components/shadCn/ui/button'
 import { Input } from '@/components/shadCn/ui/input'
 import { Badge } from '@/components/shadCn/ui/badge'
 import { Card, CardContent } from '@/components/shadCn/ui/card'
 import { toast } from 'sonner'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
   Dialog,
   DialogContent,
@@ -51,16 +52,30 @@ interface FeaturedProduct {
   }
 }
 
+interface Product {
+  id: string
+  name: string
+  price: number
+  images: string[]
+}
+
 export default function FeaturedProducts() {
   const [featured, setFeatured] = useState<FeaturedProduct[]>([])
-  const [products, setProducts] = useState<any[]>([])
+  const [availableProducts, setAvailableProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [showAddDialog, setShowAddDialog] = useState(false)
-  const [selectedProduct, setSelectedProduct] = useState<string | null>(null)
+  const [selectedProducts, setSelectedProducts] = useState<Product[]>([])
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [featuredToDelete, setFeaturedToDelete] = useState<string | null>(null)
+
+  // ✅ Product search states
+  const [productSearch, setProductSearch] = useState('')
+  const [searchResults, setSearchResults] = useState<Product[]>([])
+  const [isSearching, setIsSearching] = useState(false)
+  const [showDropdown, setShowDropdown] = useState(false)
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   const itemsPerPage = 10
 
@@ -90,46 +105,107 @@ export default function FeaturedProducts() {
     }
   }
 
+  // ✅ FIXED: Fetch available products without relationship issues
   const fetchAvailableProducts = async () => {
     try {
-      const { data, error } = await supabase
+      const featuredIds = featured.map(f => f.product_id)
+      
+      let query = supabase
         .from('products')
         .select('id, name, price, images')
-        .not('id', 'in', featured.map(f => f.product_id))
         .limit(100)
 
+      if (featuredIds.length > 0) {
+        // ✅ Use proper NOT IN syntax
+        const ids = featuredIds.map(id => `'${id}'`).join(',')
+        query = query.not('id', 'in', `(${ids})`)
+      }
+
+      const { data, error } = await query
+
       if (error) throw error
-      setProducts(data || [])
+      setAvailableProducts(data || [])
     } catch (error: any) {
       console.error('Error fetching products:', error)
+      toast.error('Failed to fetch available products: ' + error.message)
     }
   }
 
-  const addFeatured = async () => {
-    if (!selectedProduct) {
-      toast.error('Please select a product')
+  // ✅ Product search handler with debounce
+  const handleProductSearch = (value: string) => {
+    setProductSearch(value)
+    setShowDropdown(value.length >= 3)
+
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current)
+    }
+
+    if (value.length >= 3) {
+      setIsSearching(true)
+      searchTimeoutRef.current = setTimeout(async () => {
+        try {
+          // Search in available products
+          const filtered = availableProducts.filter(p => 
+            p.name.toLowerCase().includes(value.toLowerCase()) &&
+            !selectedProducts.some(sp => sp.id === p.id)
+          )
+          setSearchResults(filtered.slice(0, 10))
+        } catch (error) {
+          console.error('Error searching products:', error)
+        } finally {
+          setIsSearching(false)
+        }
+      }, 300)
+    } else {
+      setSearchResults([])
+      setIsSearching(false)
+    }
+  }
+
+  // ✅ Add product to selection
+  const addProduct = (product: Product) => {
+    setSelectedProducts([...selectedProducts, product])
+    setSearchResults(searchResults.filter(p => p.id !== product.id))
+    setProductSearch('')
+    setShowDropdown(false)
+  }
+
+  // ✅ Remove product from selection
+  const removeProduct = (productId: string) => {
+    setSelectedProducts(selectedProducts.filter(p => p.id !== productId))
+  }
+
+  // ✅ Add multiple featured products
+  const addFeaturedProducts = async () => {
+    if (selectedProducts.length === 0) {
+      toast.error('Please select at least one product')
       return
     }
 
     try {
       const displayOrder = featured.length + 1
+      const productsToInsert = selectedProducts.map((product, index) => ({
+        product_id: product.id,
+        display_order: displayOrder + index,
+        is_active: true,
+        created_at: new Date().toISOString(),
+      }))
+
       const { error } = await supabase
         .from('featured_products')
-        .insert({
-          product_id: selectedProduct,
-          display_order: displayOrder,
-          is_active: true,
-          created_at: new Date().toISOString(),
-        })
+        .insert(productsToInsert)
 
       if (error) throw error
-      toast.success('Product added to featured')
+      
+      toast.success(`${selectedProducts.length} product(s) added to featured`)
       setShowAddDialog(false)
-      setSelectedProduct(null)
+      setSelectedProducts([])
+      setProductSearch('')
+      setSearchResults([])
       fetchFeatured()
       fetchAvailableProducts()
     } catch (error: any) {
-      toast.error('Failed to add featured product: ' + error.message)
+      toast.error('Failed to add featured products: ' + error.message)
     }
   }
 
@@ -163,7 +239,6 @@ export default function FeaturedProducts() {
     const swapped = [...featured]
     ;[swapped[index], swapped[newIndex]] = [swapped[newIndex], swapped[index]]
 
-    // Update display_order for both items
     const updates = [
       { id: swapped[index].id, display_order: index + 1 },
       { id: swapped[newIndex].id, display_order: newIndex + 1 },
@@ -197,13 +272,21 @@ export default function FeaturedProducts() {
           <p className="text-gray-500">Manage products displayed on homepage</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={fetchFeatured}>
+          <Button variant="outline" size="sm" onClick={() => {
+            fetchFeatured()
+            fetchAvailableProducts()
+          }}>
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
           <Button 
             className="bg-pink-600 hover:bg-pink-700 text-white"
-            onClick={() => setShowAddDialog(true)}
+            onClick={() => {
+              setSelectedProducts([])
+              setProductSearch('')
+              setSearchResults([])
+              setShowAddDialog(true)
+            }}
           >
             <Plus className="h-4 w-4 mr-2" />
             Add Product
@@ -215,8 +298,8 @@ export default function FeaturedProducts() {
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         {[
           { label: 'Featured Products', value: featured.length, icon: Star, color: 'text-yellow-600' },
-          { label: 'Available Products', value: products.length, icon: Package, color: 'text-blue-600' },
-          { label: 'Total Products', value: featured.length + products.length, icon: Package, color: 'text-green-600' },
+          { label: 'Available Products', value: availableProducts.length, icon: Package, color: 'text-blue-600' },
+          { label: 'Total Products', value: featured.length + availableProducts.length, icon: Package, color: 'text-green-600' },
         ].map((stat, index) => (
           <motion.div
             key={index}
@@ -374,39 +457,107 @@ export default function FeaturedProducts() {
 
       {/* Add Featured Dialog */}
       <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-        <DialogContent>
+        <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Add Featured Product</DialogTitle>
+            <DialogTitle>Add Featured Products</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
+            {/* Product Search */}
             <div className="space-y-2">
-              <Label>Select Product</Label>
-              <select
-                value={selectedProduct || ''}
-                onChange={(e) => setSelectedProduct(e.target.value || null)}
-                className="w-full rounded-md border border-input bg-background px-3 py-2"
-              >
-                <option value="">Choose a product...</option>
-                {products.map((product) => (
-                  <option key={product.id} value={product.id}>
-                    {product.name} - KSh {product.price.toLocaleString()}
-                  </option>
-                ))}
-              </select>
+              <Label>Search Products</Label>
+              <div className="relative">
+                <Input
+                  placeholder="Search products (min 3 characters)..."
+                  value={productSearch}
+                  onChange={(e) => handleProductSearch(e.target.value)}
+                  className="pr-10"
+                />
+                {isSearching && (
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-pink-600 border-t-transparent" />
+                  </div>
+                )}
+                
+                {/* Search Results Dropdown */}
+                <AnimatePresence>
+                  {showDropdown && searchResults.length > 0 && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-48 overflow-y-auto"
+                    >
+                      {searchResults.map((product) => (
+                        <button
+                          key={product.id}
+                          onClick={() => addProduct(product)}
+                          className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-3 transition-colors"
+                        >
+                          <div className="w-10 h-10 rounded overflow-hidden bg-gray-200 dark:bg-gray-700 flex-shrink-0">
+                            <img 
+                              src={product.images?.[0] || '/images/placeholder.jpg'} 
+                              alt={product.name}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                          <div>
+                            <p className="font-medium">{product.name}</p>
+                            <p className="text-sm text-gray-500">KSh {product.price.toLocaleString()}</p>
+                          </div>
+                        </button>
+                      ))}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {showDropdown && productSearch.length >= 3 && searchResults.length === 0 && !isSearching && (
+                  <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-4 text-center text-gray-500">
+                    No products found
+                  </div>
+                )}
+              </div>
+
+              {/* Selected Products */}
+              {selectedProducts.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {selectedProducts.map((product) => (
+                    <Badge
+                      key={product.id}
+                      className="bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-400 flex items-center gap-1 px-3 py-1.5"
+                    >
+                      {product.name}
+                      <button
+                        type="button"
+                        onClick={() => removeProduct(product.id)}
+                        className="ml-1 hover:text-pink-600"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              )}
+              <p className="text-xs text-gray-500">
+                {selectedProducts.length} product{selectedProducts.length !== 1 ? 's' : ''} selected
+              </p>
             </div>
+
             <div className="flex gap-2 pt-4">
               <Button 
                 className="flex-1 bg-pink-600 hover:bg-pink-700 text-white"
-                onClick={addFeatured}
+                onClick={addFeaturedProducts}
+                disabled={selectedProducts.length === 0}
               >
-                Add to Featured
+                Add {selectedProducts.length > 0 ? `${selectedProducts.length} Product(s)` : 'Products'} to Featured
               </Button>
               <Button 
                 variant="outline" 
                 className="flex-1"
                 onClick={() => {
                   setShowAddDialog(false)
-                  setSelectedProduct(null)
+                  setSelectedProducts([])
+                  setProductSearch('')
+                  setSearchResults([])
                 }}
               >
                 Cancel

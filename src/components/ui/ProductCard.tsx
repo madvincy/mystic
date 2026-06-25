@@ -6,7 +6,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { motion } from 'framer-motion'
 import { useDispatch } from 'react-redux'
-import { ShoppingCart, Heart, Star, Eye, Check } from 'lucide-react'
+import { ShoppingCart, Heart, Star, Eye, Check, Wine } from 'lucide-react'
 import { Button } from '@/components/shadCn/ui/button'
 import { addItem } from '@/lib/store/cartSlice'
 import { toast } from 'sonner'
@@ -51,6 +51,18 @@ export default function ProductCard({
   const stock = selectedVariant?.stock ?? 0
   const isOutOfStock = product.stock_status === 'out_of_stock' || stock === 0
 
+  // ✅ Get ABV value from product or selected variant
+  const getABV = () => {
+    // If there's a selected variant with ABV, use that
+    if (selectedVariant?.abv !== null && selectedVariant?.abv !== undefined) {
+      return selectedVariant.abv
+    }
+    // Otherwise use product ABV
+    return product.abv
+  }
+
+  const abvValue = getABV()
+
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
@@ -67,7 +79,7 @@ export default function ProductCard({
       productId: product.id,
       variantId: selectedVariant?.id,
       name: product.name,
-      variantValue: selectedVariant?.variant_value,
+      variantValue: selectedVariant?.variant_value || undefined,
       price: price,
       quantity: 1,
       image: product.images?.[0] || '/images/placeholder.jpg',
@@ -88,7 +100,7 @@ export default function ProductCard({
   // Compact variant
   if (variant === 'compact') {
     return (
-      <div className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm hover:shadow-md transition-all">
+      <div className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm hover:shadow-md transition-all dark:shadow-[0_4px_20px_rgba(236,72,153,0.15)] dark:hover:shadow-[0_8px_30px_rgba(236,72,153,0.25)]">
         <Link href={`/products/${product.slug}`} className="shrink-0">
           <div className="relative w-16 h-16 rounded overflow-hidden bg-gray-100 dark:bg-gray-700">
             <Image
@@ -132,7 +144,7 @@ export default function ProductCard({
   // Featured variant (larger)
   if (variant === 'featured') {
     return (
-      <div className="group relative bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden">
+      <div className="group relative bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden dark:shadow-[0_8px_40px_rgba(236,72,153,0.2)] dark:hover:shadow-[0_12px_60px_rgba(236,72,153,0.35)] transition-shadow duration-300">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
           <div className="relative aspect-square md:aspect-auto md:h-full bg-gray-100 dark:bg-gray-700">
             <Link href={`/products/${product.slug}`}>
@@ -179,6 +191,16 @@ export default function ProductCard({
               )}
             </div>
 
+            {/* ✅ ABV Display for Featured Card */}
+            {product.product_type === 'alcoholic' && abvValue !== null && abvValue !== undefined && (
+              <div className="flex items-center gap-1 mb-3">
+                <Wine className="h-4 w-4 text-pink-600" />
+                <span className="text-sm font-medium text-pink-600">
+                  {abvValue}% ABV
+                </span>
+              </div>
+            )}
+
             {/* Variants for featured card */}
             {product.variants && product.variants.length > 1 && (
               <div className="flex gap-1 mt-2 mb-4 flex-wrap">
@@ -194,13 +216,16 @@ export default function ProductCard({
                     )}
                   >
                     {variant.variant_value}
+                    {variant.abv && (
+                      <span className="text-xs text-gray-400 ml-1">({variant.abv}%)</span>
+                    )}
                   </button>
                 ))}
               </div>
             )}
 
             <Button
-              className="bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-700 hover:to-purple-700 text-white"
+              className="bg-pink-600 hover:bg-pink-700 text-white"
               size="lg"
               onClick={handleAddToCart}
               disabled={isOutOfStock}
@@ -223,12 +248,13 @@ export default function ProductCard({
     )
   }
 
-  // Default card
+  // Default card - with hot pink shadow on dark theme
   return (
     <motion.div
       whileHover={{ y: -5 }}
       className={cn(
-        "group relative bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden transition-shadow hover:shadow-xl",
+        "group relative bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden transition-all duration-300",
+        "dark:shadow-[0_4px_20px_rgba(236,72,153,0.15)] dark:hover:shadow-[0_8px_40px_rgba(236,72,153,0.3)]",
         className
       )}
       onMouseEnter={() => setIsHovered(true)}
@@ -326,6 +352,16 @@ export default function ProductCard({
           <span className="text-xs text-gray-500">({product.review_count || 0})</span>
         </div>
 
+        {/* ✅ ABV Display for Default Card */}
+        {product.product_type === 'alcoholic' && abvValue !== null && abvValue !== undefined && (
+          <div className="flex items-center gap-1 mt-1">
+            <Wine className="h-3 w-3 text-pink-600" />
+            <span className="text-xs font-medium text-pink-600">
+              {abvValue}% ABV
+            </span>
+          </div>
+        )}
+
         {/* Price - Updates with variant selection */}
         <div className="flex items-center gap-2 mt-2 flex-wrap">
           <span className="font-bold text-pink-600 dark:text-pink-400">
@@ -358,6 +394,9 @@ export default function ProductCard({
                 )}
               >
                 {variant.variant_value}
+                {variant.abv && (
+                  <span className="text-xs text-gray-400 ml-1">({variant.abv}%)</span>
+                )}
               </button>
             ))}
             {product.variants.length > 3 && (
@@ -366,11 +405,11 @@ export default function ProductCard({
           </div>
         )}
 
-        {/* Add to Cart */}
+        {/* Add to Cart - Plain Pink */}
         <div className="mt-3">
           <Button
             onClick={handleAddToCart}
-            className="w-full bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-700 hover:to-purple-700 text-white text-sm transition-all"
+            className="w-full bg-pink-600 hover:bg-pink-700 text-white text-sm transition-all"
             disabled={isOutOfStock}
           >
             {isAdded ? (

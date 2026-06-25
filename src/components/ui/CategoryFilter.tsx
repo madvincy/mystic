@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { ChevronRight, ChevronDown, X, Wine, Beer, Martini, Zap, CupSoda, WineIcon, Shirt, GlassWater } from 'lucide-react'
+import { ChevronRight, ChevronDown, X, Wine, Beer, Martini, Zap, CupSoda, WineIcon, Shirt, GlassWater, PillBottle, Sparkles, ShoppingBasket, Beaker } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { supabase } from '@/lib/supabase/client'
 import { Button } from '@/components/shadCn/ui/button'
@@ -35,6 +35,11 @@ const categoryIcons: Record<string, any> = {
   'Soft Drinks': CupSoda,
   'Merchandise': Shirt,
   'Water': GlassWater,
+  'Jaba Juice': PillBottle,
+  'Sparkling': Sparkles,
+  'Extras': ShoppingBasket,
+  'Vermouth & Shooters': Beaker,
+  'Tonics': CupSoda,
 }
 
 export default function CategoryFilter({

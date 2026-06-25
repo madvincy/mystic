@@ -1,18 +1,12 @@
 // src/app/api/uploads/images/route.ts
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase/client'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/app/api/auth/[...nextauth]/route'
+
+
 
 export async function POST(request: Request) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session || !session.user?.isAdmin) {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
+   
 
     const formData = await request.formData()
     const file = formData.get('file') as File
@@ -84,13 +78,7 @@ export async function POST(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session || !session.user?.isAdmin) {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
+   
 
     const { searchParams } = new URL(request.url)
     const filename = searchParams.get('filename')

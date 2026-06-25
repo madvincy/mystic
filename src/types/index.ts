@@ -182,6 +182,8 @@ export interface CartItem {
   productId: string
   variantId?: string
   name: string
+  description?: string
+  
   variantValue?: string
   price: number
   quantity: number

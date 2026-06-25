@@ -34,7 +34,7 @@ import ThemeToggle from "./ThemeToggle";
 import MobileMenu from "./MobileMenu";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
-import { supabase } from "@/lib/supabase/client";
+import { useSupabaseAuth } from "@/providers/SupabaseAuthProvider";
 
 // Category structure with subcategories
 const categoryStructure = {
@@ -95,43 +95,17 @@ export default function Header() {
   const { itemCount } = useSelector((state: RootState) => state.cart);
   const { isCartOpen } = useSelector((state: RootState) => state.ui);
 
+  // ✅ Use auth context instead of direct supabase calls
+  const { user, isAdmin, loading: authLoading, signOut } = useSupabaseAuth();
+
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [isScrolled, setIsScrolled] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [hoveredCategory, setHoveredCategory] = useState<string | null>(null);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
-  const [user, setUser] = useState<any>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
 
-  // ✅ ALL useEffect hooks at the top
-  useEffect(() => {
-    const getUser = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      setUser(user);
-
-      if (user) {
-        const { data } = await supabase
-          .from("users")
-          .select("is_admin")
-          .eq("id", user.id)
-          .single();
-        setIsAdmin(data?.is_admin || false);
-      }
-    };
-    getUser();
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
-      setUser(session?.user || null);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
+  // ✅ useEffect for mounting and scroll
   useEffect(() => {
     setMounted(true);
     dispatch(loadCartFromCache());
@@ -161,10 +135,12 @@ export default function Header() {
   };
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    setUser(null);
-    setIsAdmin(false);
-    router.push("/");
+    try {
+      await signOut();
+      router.push("/");
+    } catch (error) {
+      console.error("Sign out error:", error);
+    }
   };
 
   // Navigation items
@@ -221,7 +197,7 @@ export default function Header() {
       (slug) =>
         pathname?.includes(`/products/${slug}`) ||
         pathname?.includes(`?subcategory=${slug}`) ||
-        pathname?.includes(`?category=${slug}`)
+        pathname?.includes(`?category=${slug}`),
     );
   };
 
@@ -246,21 +222,37 @@ export default function Header() {
       >
         <div className="container mx-auto px-4">
           <div className="flex items-center justify-between h-20">
-            {/* Logo with Image */}
-            <Link href="/" className="flex items-center gap-3 shrink-0 group">
-              <div className="relative w-10 h-10 rounded-full overflow-hidden bg-gradient-to-r from-pink-600 to-purple-600 flex items-center justify-center">
-                <Image
-                  src="/images/logos/main-logo.png"
-                  alt="Mystic Wines"
-                  width={60}
-                  height={60}
-                  className="object-cover"
-                  priority
-                />
+            {/* Logo with Image and Centered Mission */}
+            <Link
+              href="/"
+              className="flex flex-col items-center shrink-0 group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="relative w-16 h-16 rounded-full overflow-hidden bg-gradient-to-r from-pink-600 to-purple-600 flex items-center justify-center">
+                  <Image
+                    src="/images/logos/main-logo.png"
+                    alt="Mystic Liqour Store"
+                    width={100}
+                    height={100}
+                    className="object-cover"
+                    priority
+                  />
+                </div>
+                <div className="flex flex-col items-center">
+                  <span className="text-xl font-display font-bold text-pink-600 dark:text-pink-400 group-hover:scale-105 transition-transform tracking-wide drop-shadow-[0_0_10px_rgba(236,72,153,0.3)]">
+                    Mystic Liqour Store
+                  </span>
+                  {/* Business Mission - Centered below the store name */}
+                  <motion.span
+                    initial={{ opacity: 0, y: 5 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.3 }}
+                    className="text-xs font-serif font-light italic tracking-widest bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent -mt-0.5 text-center"
+                  >
+                    Drink Your Worth
+                  </motion.span>
+                </div>
               </div>
-              <span className="text-2xl font-bold bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent group-hover:scale-105 transition-transform">
-                MysticWines
-              </span>
             </Link>
 
             {/* Desktop Navigation with Dropdowns */}
@@ -277,7 +269,7 @@ export default function Header() {
                     "flex items-center gap-1 text-xl font-medium transition-colors py-2",
                     isCategoryActive("Wine")
                       ? "text-pink-600 dark:text-pink-400"
-                      : "text-gray-700 dark:text-gray-300 hover:text-pink-600 dark:hover:text-pink-400"
+                      : "text-gray-700 dark:text-gray-300 hover:text-pink-600 dark:hover:text-pink-400",
                   )}
                 >
                   <Wine className="h-4 w-4" />
@@ -302,7 +294,7 @@ export default function Header() {
                     >
                       {categoryStructure.Wine.subcategories.map((sub) => {
                         const isSubActive = pathname?.includes(
-                          `?subcategory=${sub.slug}`
+                          `?subcategory=${sub.slug}`,
                         );
                         return (
                           <Link
@@ -312,7 +304,7 @@ export default function Header() {
                               "block px-4 py-2 text-xl transition-colors",
                               isSubActive
                                 ? "bg-pink-50 dark:bg-pink-900/20 text-pink-600 dark:text-pink-400 font-medium"
-                                : "hover:bg-pink-50 dark:hover:bg-pink-900/20 hover:text-pink-600"
+                                : "hover:bg-pink-50 dark:hover:bg-pink-900/20 hover:text-pink-600",
                             )}
                             onClick={() => setHoveredCategory(null)}
                           >
@@ -342,7 +334,7 @@ export default function Header() {
                     "flex items-center gap-1 text-xl font-medium transition-colors py-2",
                     isCategoryActive("Beer")
                       ? "text-pink-600 dark:text-pink-400"
-                      : "text-gray-700 dark:text-gray-300 hover:text-pink-600 dark:hover:text-pink-400"
+                      : "text-gray-700 dark:text-gray-300 hover:text-pink-600 dark:hover:text-pink-400",
                   )}
                 >
                   <Beer className="h-4 w-4" />
@@ -367,7 +359,7 @@ export default function Header() {
                     >
                       {categoryStructure.Beer.subcategories.map((sub) => {
                         const isSubActive = pathname?.includes(
-                          `?subcategory=${sub.slug}`
+                          `?subcategory=${sub.slug}`,
                         );
                         return (
                           <Link
@@ -377,7 +369,7 @@ export default function Header() {
                               "block px-4 py-2 text-xl transition-colors",
                               isSubActive
                                 ? "bg-pink-50 dark:bg-pink-900/20 text-pink-600 dark:text-pink-400 font-medium"
-                                : "hover:bg-pink-50 dark:hover:bg-pink-900/20 hover:text-pink-600"
+                                : "hover:bg-pink-50 dark:hover:bg-pink-900/20 hover:text-pink-600",
                             )}
                             onClick={() => setHoveredCategory(null)}
                           >
@@ -407,7 +399,7 @@ export default function Header() {
                     "flex items-center gap-1 text-xl font-medium transition-colors py-2",
                     isCategoryActive("Spirits")
                       ? "text-pink-600 dark:text-pink-400"
-                      : "text-gray-700 dark:text-gray-300 hover:text-pink-600 dark:hover:text-pink-400"
+                      : "text-gray-700 dark:text-gray-300 hover:text-pink-600 dark:hover:text-pink-400",
                   )}
                 >
                   <Martini className="h-4 w-4" />
@@ -432,7 +424,7 @@ export default function Header() {
                     >
                       {categoryStructure.Spirits.subcategories.map((sub) => {
                         const isSubActive = pathname?.includes(
-                          `?subcategory=${sub.slug}`
+                          `?subcategory=${sub.slug}`,
                         );
                         return (
                           <Link
@@ -442,7 +434,7 @@ export default function Header() {
                               "block px-4 py-2 text-xl transition-colors",
                               isSubActive
                                 ? "bg-pink-50 dark:bg-pink-900/20 text-pink-600 dark:text-pink-400 font-medium"
-                                : "hover:bg-pink-50 dark:hover:bg-pink-900/20 hover:text-pink-600"
+                                : "hover:bg-pink-50 dark:hover:bg-pink-900/20 hover:text-pink-600",
                             )}
                             onClick={() => setHoveredCategory(null)}
                           >
@@ -496,7 +488,7 @@ export default function Header() {
                               "block px-4 py-2 text-xl transition-colors",
                               isActive
                                 ? "bg-pink-50 dark:bg-pink-900/20 text-pink-600 dark:text-pink-400 font-medium"
-                                : "hover:bg-pink-50 dark:hover:bg-pink-900/20 hover:text-pink-600"
+                                : "hover:bg-pink-50 dark:hover:bg-pink-900/20 hover:text-pink-600",
                             )}
                             onClick={() => setShowMoreMenu(false)}
                           >
@@ -525,14 +517,14 @@ export default function Header() {
                       "text-xl font-medium transition-colors relative group py-2",
                       active
                         ? "text-pink-600 dark:text-pink-400"
-                        : "text-gray-700 dark:text-gray-300 hover:text-pink-600 dark:hover:text-pink-400"
+                        : "text-gray-700 dark:text-gray-300 hover:text-pink-600 dark:hover:text-pink-400",
                     )}
                   >
                     {item.name}
                     <span
                       className={cn(
                         "absolute -bottom-1 left-0 h-0.5 bg-pink-600 transition-all duration-300",
-                        active ? "w-full" : "w-0 group-hover:w-full"
+                        active ? "w-full" : "w-0 group-hover:w-full",
                       )}
                     />
                     {active && item.name !== "HOME" && (

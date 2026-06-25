@@ -1,13 +1,26 @@
 // src/app/api/wishlist/add/route.ts
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase/client'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/app/api/auth/[...nextauth]/route'
+
+
 
 export async function POST(request: Request) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
+  const authHeader = request.headers.get('Authorization')
+    if (!authHeader) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized' },
+        { status: 401 }
+      )
+    }
+
+    // ✅ Extract the token
+    const token = authHeader.replace('Bearer ', '')
+    
+    // ✅ Get user from Supabase using the token
+    const { data: { user }, error: userError } = await supabase.auth.getUser(token)
+    
+    if (userError || !user) {
       return NextResponse.json(
         { success: false, error: 'Unauthorized' },
         { status: 401 }
@@ -28,7 +41,7 @@ export async function POST(request: Request) {
     const { data: existing, error: checkError } = await supabase
       .from('wishlist')
       .select('id')
-      .eq('user_id', session.user.id)
+      .eq('user_id', user.id)
       .eq('product_id', productId)
       .eq('variant_id', variantId || '')
       .maybeSingle()
@@ -46,7 +59,7 @@ export async function POST(request: Request) {
     const { data, error } = await supabase
       .from('wishlist')
       .insert({
-        user_id: session.user.id,
+        user_id: user.id,
         product_id: productId,
         variant_id: variantId || null,
         created_at: new Date().toISOString(),

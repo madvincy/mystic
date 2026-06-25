@@ -1,21 +1,14 @@
 // src/app/api/orders/create/route.ts
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase/client'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/app/api/auth/[...nextauth]/route'
+
+
 
 export async function POST(request: Request) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
 
     const body = await request.json()
-    const { items, shipping_address, payment_method, total_amount, shipping_cost, tax } = body
+    const { user, items, shipping_address, payment_method, total_amount, shipping_cost, tax } = body
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       return NextResponse.json(
@@ -32,7 +25,7 @@ export async function POST(request: Request) {
       .from('orders')
       .insert({
         order_number: orderNumber,
-        user_id: session.user.id,
+        user_id: user.id,
         total_amount,
         shipping_cost: shipping_cost || 0,
         tax: tax || 0,
