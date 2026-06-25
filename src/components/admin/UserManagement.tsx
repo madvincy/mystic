@@ -170,7 +170,19 @@ export default function UserManagement() {
       setLoading(false)
     }
   }
-
+  
+  useEffect(() => {
+     const checkMobile = () => {
+       const mobile = window.innerWidth < 768
+       setViewMode(mobile ? 'grid' : 'table')
+     }
+ 
+     checkMobile()
+     window.addEventListener('resize', checkMobile)
+ 
+     return () => window.removeEventListener('resize', checkMobile)
+   }, [])
+ 
   // CRUD Operations
   const createUser = async (userData: Partial<User>) => {
     try {

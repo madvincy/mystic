@@ -21,7 +21,8 @@ import {
   ShoppingCart,
   AlertTriangle,
   Info,
-  Filter
+  Filter,
+  Menu
 } from 'lucide-react'
 import { Button } from '@/components/shadCn/ui/button'
 import { Input } from '@/components/shadCn/ui/input'
@@ -55,6 +56,12 @@ import {
 import { Label } from '@/components/shadCn/ui/label'
 import { Textarea } from '@/components/shadCn/ui/textarea'
 import Link from 'next/link'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/shadCn/ui/dropdown-menu'
 
 interface Notification {
   id: string
@@ -72,7 +79,6 @@ interface Notification {
   metadata: any
   created_at: string
   read_at: string | null
-  // User data fetched separately
   user_name?: string
   user_email?: string
 }
@@ -90,6 +96,7 @@ export default function Notifications() {
   const [filterType, setFilterType] = useState<string>('all')
   const [showUnreadOnly, setShowUnreadOnly] = useState(false)
   const [autoRefresh, setAutoRefresh] = useState(true)
+  const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false)
   const [stats, setStats] = useState({
     total: 0,
     unread: 0,
@@ -100,11 +107,9 @@ export default function Notifications() {
 
   const itemsPerPage = 10
 
-  // ✅ Fetch notifications with real-time subscription
   useEffect(() => {
     fetchNotifications()
 
-    // Set up real-time subscription
     const channel = supabase
       .channel('notifications-changes')
       .on(
@@ -121,7 +126,6 @@ export default function Notifications() {
       )
       .subscribe()
 
-    // Auto-refresh every 30 seconds
     let interval: NodeJS.Timeout
     if (autoRefresh) {
       interval = setInterval(() => {
@@ -135,11 +139,9 @@ export default function Notifications() {
     }
   }, [autoRefresh])
 
-  // ✅ Fetch notifications without nested relationship
   const fetchNotifications = async () => {
     setLoading(true)
     try {
-      // Fetch notifications
       const { data: notificationsData, error: notificationsError } = await supabase
         .from('notifications')
         .select('*')
@@ -147,33 +149,27 @@ export default function Notifications() {
 
       if (notificationsError) throw notificationsError
 
-      // If there are notifications with user_id, fetch user data separately
       let notificationsWithUsers = notificationsData || []
       
       if (notificationsData && notificationsData.length > 0) {
-        // Get unique user IDs
         const userIds = notificationsData
           .map(n => n.user_id)
           .filter(id => id !== null) as string[]
         
-        // Remove duplicates
         const uniqueUserIds = [...new Set(userIds)]
         
         if (uniqueUserIds.length > 0) {
-          // Fetch user data
           const { data: usersData, error: usersError } = await supabase
             .from('users')
             .select('id, name, email')
             .in('id', uniqueUserIds)
 
           if (!usersError && usersData) {
-            // Create a map of user data
             const userMap = usersData.reduce((acc, user) => {
               acc[user.id] = user
               return acc
             }, {} as Record<string, { id: string; name: string; email: string }>)
 
-            // Merge user data into notifications
             notificationsWithUsers = notificationsData.map(notification => ({
               ...notification,
               user_name: notification.user_id ? userMap[notification.user_id]?.name : undefined,
@@ -185,7 +181,6 @@ export default function Notifications() {
 
       setNotifications(notificationsWithUsers)
       
-      // Update stats
       setStats({
         total: notificationsWithUsers.length,
         unread: notificationsWithUsers.filter(n => !n.is_read).length,
@@ -201,7 +196,6 @@ export default function Notifications() {
     }
   }
 
-  // ✅ Save notification
   const saveNotification = async () => {
     try {
       if (!editingNotification.title || !editingNotification.message) {
@@ -248,7 +242,6 @@ export default function Notifications() {
     }
   }
 
-  // ✅ Run stock check manually
   const runStockCheck = async () => {
     try {
       const { error } = await supabase.rpc('check_low_stock_notifications')
@@ -260,7 +253,6 @@ export default function Notifications() {
     }
   }
 
-  // ✅ Run order check manually
   const runOrderCheck = async () => {
     try {
       const { error } = await supabase.rpc('check_pending_order_notifications')
@@ -325,7 +317,6 @@ export default function Notifications() {
     }
   }
 
-  // ✅ Filter notifications
   const filteredNotifications = notifications.filter(n => {
     const matchesSearch = 
       n.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -370,78 +361,120 @@ export default function Notifications() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6 px-2 sm:px-4 md:px-0">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
         <div>
-          <h2 className="text-2xl font-bold">Notifications</h2>
-          <p className="text-gray-500">Manage system notifications and alerts</p>
+          <h2 className="text-xl sm:text-2xl font-bold">Notifications</h2>
+          <p className="text-sm text-gray-500">Manage system notifications and alerts</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={runStockCheck}
-          >
-            <Package className="h-4 w-4 mr-2" />
-            Check Stock
-          </Button>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={runOrderCheck}
-          >
-            <ShoppingCart className="h-4 w-4 mr-2" />
-            Check Orders
-          </Button>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={markAllAsRead}
-            disabled={stats.unread === 0}
-          >
-            <CheckCircle className="h-4 w-4 mr-2" />
-            Mark All Read
-          </Button>
-          <Button variant="outline" size="sm" onClick={fetchNotifications}>
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Refresh
-          </Button>
-          <Button 
-            className="bg-pink-600 hover:bg-pink-700 text-white"
-            onClick={() => {
-              setEditingNotification({})
-              setShowDialog(true)
-            }}
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Send Notification
-          </Button>
+          {/* Desktop Action Buttons */}
+          <div className="hidden lg:flex flex-wrap gap-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={runStockCheck}
+              className="text-xs sm:text-sm"
+            >
+              <Package className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+              <span className="hidden sm:inline">Check Stock</span>
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={runOrderCheck}
+              className="text-xs sm:text-sm"
+            >
+              <ShoppingCart className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+              <span className="hidden sm:inline">Check Orders</span>
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={markAllAsRead}
+              disabled={stats.unread === 0}
+              className="text-xs sm:text-sm"
+            >
+              <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+              <span className="hidden sm:inline">Mark All Read</span>
+            </Button>
+            <Button variant="outline" size="sm" onClick={fetchNotifications} className="text-xs sm:text-sm">
+              <RefreshCw className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+              <span className="hidden sm:inline">Refresh</span>
+            </Button>
+            <Button 
+              className="bg-pink-600 hover:bg-pink-700 text-white text-xs sm:text-sm"
+              onClick={() => {
+                setEditingNotification({})
+                setShowDialog(true)
+              }}
+            >
+              <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+              <span className="hidden sm:inline">Send Notification</span>
+            </Button>
+          </div>
+
+          {/* Mobile Action Buttons */}
+          <div className="flex lg:hidden gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="px-2 sm:px-3">
+                  <Menu className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem onClick={runStockCheck}>
+                  <Package className="h-4 w-4 mr-2" />
+                  Check Stock
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={runOrderCheck}>
+                  <ShoppingCart className="h-4 w-4 mr-2" />
+                  Check Orders
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={markAllAsRead} disabled={stats.unread === 0}>
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  Mark All Read
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={fetchNotifications}>
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Refresh
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => {
+                  setEditingNotification({})
+                  setShowDialog(true)
+                }}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Send Notification
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      {/* Stats - Responsive Grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4">
         {[
           { label: 'Total', value: stats.total, icon: Bell, color: 'text-blue-600' },
           { label: 'Unread', value: stats.unread, icon: Eye, color: 'text-yellow-600' },
-          { label: 'Inventory Alerts', value: stats.inventory, icon: Package, color: 'text-orange-600' },
-          { label: 'Order Alerts', value: stats.orders, icon: ShoppingCart, color: 'text-blue-600' },
+          { label: 'Inventory', value: stats.inventory, icon: Package, color: 'text-orange-600' },
+          { label: 'Orders', value: stats.orders, icon: ShoppingCart, color: 'text-blue-600' },
         ].map((stat, index) => (
           <motion.div
             key={index}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.1 }}
-            className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm border border-gray-200 dark:border-gray-700"
+            className="bg-white dark:bg-gray-800 rounded-lg p-3 sm:p-4 shadow-sm border border-gray-200 dark:border-gray-700"
           >
-            <div className="flex items-center gap-3">
-              <div className={`p-2 rounded-lg bg-gray-100 dark:bg-gray-700 ${stat.color}`}>
-                <stat.icon className="h-5 w-5" />
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className={`p-1.5 sm:p-2 rounded-lg bg-gray-100 dark:bg-gray-700 ${stat.color}`}>
+                <stat.icon className="h-4 w-4 sm:h-5 sm:w-5" />
               </div>
-              <div>
-                <p className="text-2xl font-bold">{stat.value}</p>
-                <p className="text-sm text-gray-500">{stat.label}</p>
+              <div className="min-w-0">
+                <p className="text-lg sm:text-2xl font-bold truncate">{stat.value}</p>
+                <p className="text-xs sm:text-sm text-gray-500 truncate">{stat.label}</p>
               </div>
             </div>
           </motion.div>
@@ -449,74 +482,154 @@ export default function Notifications() {
       </div>
 
       {/* Search & Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+      <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3 w-3 sm:h-4 sm:w-4 text-gray-400" />
           <Input
             placeholder="Search notifications..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
+            className="pl-8 sm:pl-10 text-sm"
           />
         </div>
-        <Select value={filterCategory} onValueChange={setFilterCategory}>
-          <SelectTrigger className="w-[150px]">
-            <SelectValue placeholder="Category" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Categories</SelectItem>
-            <SelectItem value="system">System</SelectItem>
-            <SelectItem value="inventory">Inventory</SelectItem>
-            <SelectItem value="orders">Orders</SelectItem>
-            <SelectItem value="marketing">Marketing</SelectItem>
-            <SelectItem value="user">User</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={filterType} onValueChange={setFilterType}>
-          <SelectTrigger className="w-[150px]">
-            <SelectValue placeholder="Type" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Types</SelectItem>
-            <SelectItem value="info">Info</SelectItem>
-            <SelectItem value="success">Success</SelectItem>
-            <SelectItem value="warning">Warning</SelectItem>
-            <SelectItem value="error">Error</SelectItem>
-          </SelectContent>
-        </Select>
-        <Button
-          variant={showUnreadOnly ? 'default' : 'outline'}
-          onClick={() => setShowUnreadOnly(!showUnreadOnly)}
-          className={showUnreadOnly ? 'bg-pink-600 hover:bg-pink-700' : ''}
-        >
-          <Eye className="h-4 w-4 mr-2" />
-          Unread Only
-        </Button>
-        <Button
-          variant="outline"
-          onClick={() => setAutoRefresh(!autoRefresh)}
-          className={autoRefresh ? 'border-green-500 text-green-600' : ''}
-        >
-          <Clock className="h-4 w-4 mr-2" />
-          Auto-refresh {autoRefresh ? 'ON' : 'OFF'}
-        </Button>
+        
+        {/* Desktop Filters */}
+        <div className="hidden sm:flex flex-wrap gap-2">
+          <Select value={filterCategory} onValueChange={setFilterCategory}>
+            <SelectTrigger className="w-[130px] text-sm">
+              <SelectValue placeholder="Category" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Categories</SelectItem>
+              <SelectItem value="system">System</SelectItem>
+              <SelectItem value="inventory">Inventory</SelectItem>
+              <SelectItem value="orders">Orders</SelectItem>
+              <SelectItem value="marketing">Marketing</SelectItem>
+              <SelectItem value="user">User</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={filterType} onValueChange={setFilterType}>
+            <SelectTrigger className="w-[130px] text-sm">
+              <SelectValue placeholder="Type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Types</SelectItem>
+              <SelectItem value="info">Info</SelectItem>
+              <SelectItem value="success">Success</SelectItem>
+              <SelectItem value="warning">Warning</SelectItem>
+              <SelectItem value="error">Error</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button
+            variant={showUnreadOnly ? 'default' : 'outline'}
+            onClick={() => setShowUnreadOnly(!showUnreadOnly)}
+            className={`text-sm ${showUnreadOnly ? 'bg-pink-600 hover:bg-pink-700' : ''}`}
+          >
+            <Eye className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+            <span className="hidden sm:inline">Unread Only</span>
+            <span className="sm:hidden">Unread</span>
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => setAutoRefresh(!autoRefresh)}
+            className={`text-sm ${autoRefresh ? 'border-green-500 text-green-600' : ''}`}
+          >
+            <Clock className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+            <span className="hidden sm:inline">Auto-refresh {autoRefresh ? 'ON' : 'OFF'}</span>
+            <span className="sm:hidden">Auto</span>
+          </Button>
+        </div>
+
+        {/* Mobile Filter Toggle */}
+        <div className="sm:hidden flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsMobileFiltersOpen(!isMobileFiltersOpen)}
+            className="flex-1"
+          >
+            <Filter className="h-4 w-4 mr-1" />
+            Filters
+            <Badge variant="secondary" className="ml-1 text-xs">
+              {filterCategory !== 'all' || filterType !== 'all' || showUnreadOnly ? 'Active' : ''}
+            </Badge>
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setAutoRefresh(!autoRefresh)}
+            className={`${autoRefresh ? 'border-green-500 text-green-600' : ''}`}
+          >
+            <Clock className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
+      {/* Mobile Filters Panel */}
+      {isMobileFiltersOpen && (
+        <motion.div
+          initial={{ height: 0, opacity: 0 }}
+          animate={{ height: 'auto', opacity: 1 }}
+          exit={{ height: 0, opacity: 0 }}
+          className="sm:hidden space-y-3 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700"
+        >
+          <div className="space-y-2">
+            <Label className="text-sm">Category</Label>
+            <Select value={filterCategory} onValueChange={setFilterCategory}>
+              <SelectTrigger className="w-full text-sm">
+                <SelectValue placeholder="Category" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Categories</SelectItem>
+                <SelectItem value="system">System</SelectItem>
+                <SelectItem value="inventory">Inventory</SelectItem>
+                <SelectItem value="orders">Orders</SelectItem>
+                <SelectItem value="marketing">Marketing</SelectItem>
+                <SelectItem value="user">User</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label className="text-sm">Type</Label>
+            <Select value={filterType} onValueChange={setFilterType}>
+              <SelectTrigger className="w-full text-sm">
+                <SelectValue placeholder="Type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                <SelectItem value="info">Info</SelectItem>
+                <SelectItem value="success">Success</SelectItem>
+                <SelectItem value="warning">Warning</SelectItem>
+                <SelectItem value="error">Error</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <Button
+            variant={showUnreadOnly ? 'default' : 'outline'}
+            onClick={() => setShowUnreadOnly(!showUnreadOnly)}
+            className={`w-full ${showUnreadOnly ? 'bg-pink-600 hover:bg-pink-700' : ''}`}
+          >
+            <Eye className="h-4 w-4 mr-2" />
+            {showUnreadOnly ? 'Showing Unread Only' : 'Show Unread Only'}
+          </Button>
+        </motion.div>
+      )}
+
       {/* Notifications List */}
-      <div className="space-y-3">
+      <div className="space-y-2 sm:space-y-3">
         {loading ? (
           [...Array(5)].map((_, i) => (
             <Card key={i} className="animate-pulse">
-              <CardContent className="p-4">
+              <CardContent className="p-3 sm:p-4">
                 <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4 mb-2" />
                 <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2" />
               </CardContent>
             </Card>
           ))
         ) : paginatedNotifications.length === 0 ? (
-          <div className="text-center py-12 text-gray-500">
-            <Bell className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-            <p>No notifications found</p>
+          <div className="text-center py-8 sm:py-12 text-gray-500">
+            <Bell className="h-10 w-10 sm:h-12 sm:w-12 mx-auto mb-2 sm:mb-3 text-gray-300" />
+            <p className="text-sm sm:text-base">No notifications found</p>
           </div>
         ) : (
           paginatedNotifications.map((notification) => (
@@ -525,66 +638,67 @@ export default function Notifications() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
             >
-              <Card className={`hover:shadow-md transition-shadow ${!notification.is_read ? 'border-l-4 border-l-pink-600' : ''}`}>
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <Badge className={typeColors[notification.type] || 'bg-gray-100'}>
-                          <span className="flex items-center gap-1">
-                            {categoryIcons[notification.category] || <Bell className="h-3 w-3" />}
-                            {notification.category}
+              <Card className={`hover:shadow-md transition-shadow ${!notification.is_read ? 'border-l-2 sm:border-l-4 border-l-pink-600' : ''}`}>
+                <CardContent className="p-3 sm:p-4">
+                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2 sm:gap-0">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-1 sm:gap-2">
+                        <Badge className={`${typeColors[notification.type] || 'bg-gray-100'} text-xs`}>
+                          <span className="flex items-center gap-0.5 sm:gap-1">
+                            {categoryIcons[notification.category] || <Bell className="h-2.5 w-2.5 sm:h-3 sm:w-3" />}
+                            <span className="hidden sm:inline">{notification.category}</span>
+                            <span className="sm:hidden">{notification.category.slice(0, 3)}</span>
                           </span>
                         </Badge>
-                        <Badge className={categoryColors[notification.category] || 'bg-gray-100'}>
+                        <Badge className={`${categoryColors[notification.category] || 'bg-gray-100'} text-xs`}>
                           {notification.type}
                         </Badge>
                         {!notification.is_read && (
-                          <Badge className="bg-pink-600 animate-pulse">New</Badge>
+                          <Badge className="bg-pink-600 animate-pulse text-xs">New</Badge>
                         )}
-                        <span className="text-xs text-gray-500">
-                          {new Date(notification.created_at).toLocaleDateString()} at{' '}
-                          {new Date(notification.created_at).toLocaleTimeString()}
+                        <span className="text-xs text-gray-500 truncate">
+                          {new Date(notification.created_at).toLocaleDateString()} {new Date(notification.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                         </span>
                       </div>
-                      <h3 className="font-medium mt-1">{notification.title}</h3>
-                      <p className="text-sm text-gray-500 mt-1">{notification.message}</p>
+                      <h3 className="font-medium mt-1 text-sm sm:text-base break-words">{notification.title}</h3>
+                      <p className="text-xs sm:text-sm text-gray-500 mt-1 break-words">{notification.message}</p>
                       {notification.action_url && (
                         <Link
                           href={notification.action_url}
-                          className="text-sm text-pink-600 hover:text-pink-700 mt-2 inline-block"
+                          className="text-xs sm:text-sm text-pink-600 hover:text-pink-700 mt-1 sm:mt-2 inline-block"
                         >
                           {notification.action_label || 'View Details'} →
                         </Link>
                       )}
                       {(notification.user_name || notification.user_email) && (
-                        <p className="text-xs text-gray-400 mt-1">
+                        <p className="text-xs text-gray-400 mt-1 truncate">
                           To: {notification.user_name || notification.user_email}
                         </p>
                       )}
                       {notification.metadata && Object.keys(notification.metadata).length > 0 && (
-                        <div className="mt-2 text-xs text-gray-400 bg-gray-50 dark:bg-gray-800 p-2 rounded">
+                        <div className="mt-1 sm:mt-2 text-xs text-gray-400 bg-gray-50 dark:bg-gray-800 p-1.5 sm:p-2 rounded">
                           {notification.metadata.product_name && (
-                            <span>Product: {notification.metadata.product_name}</span>
+                            <span className="inline-block mr-1 sm:mr-2">Product: {notification.metadata.product_name}</span>
                           )}
                           {notification.metadata.order_number && (
-                            <span className="ml-2">Order: #{notification.metadata.order_number}</span>
+                            <span className="inline-block mr-1 sm:mr-2">Order: #{notification.metadata.order_number}</span>
                           )}
                           {notification.metadata.stock !== undefined && (
-                            <span className="ml-2">Stock: {notification.metadata.stock} units</span>
+                            <span className="inline-block">Stock: {notification.metadata.stock} units</span>
                           )}
                         </div>
                       )}
                     </div>
-                    <div className="flex gap-2 ml-4">
+                    <div className="flex gap-1 sm:gap-2 self-end sm:self-start">
                       {!notification.is_read && (
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => markAsRead(notification.id)}
+                          className="text-xs"
                         >
-                          <CheckCircle className="h-4 w-4 mr-1" />
-                          Mark Read
+                          <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 mr-0.5 sm:mr-1" />
+                          <span className="hidden sm:inline">Mark Read</span>
                         </Button>
                       )}
                       <Button
@@ -594,8 +708,9 @@ export default function Notifications() {
                           setNotificationToDelete(notification.id)
                           setShowDeleteDialog(true)
                         }}
+                        className="px-2 sm:px-3"
                       >
-                        <Trash2 className="h-4 w-4" />
+                        <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
                       </Button>
                     </div>
                   </div>
@@ -606,9 +721,10 @@ export default function Notifications() {
         )}
       </div>
 
+      {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-gray-500">
+        <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-0 justify-between">
+          <p className="text-xs sm:text-sm text-gray-500">
             Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, filteredNotifications.length)} of {filteredNotifications.length}
           </p>
           <div className="flex gap-2">
@@ -617,10 +733,11 @@ export default function Notifications() {
               size="sm"
               onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
               disabled={currentPage === 1}
+              className="px-2 sm:px-3"
             >
-              <ChevronLeft className="h-4 w-4" />
+              <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4" />
             </Button>
-            <span className="flex items-center px-3 text-sm">
+            <span className="flex items-center px-2 sm:px-3 text-xs sm:text-sm">
               Page {currentPage} of {totalPages}
             </span>
             <Button
@@ -628,8 +745,9 @@ export default function Notifications() {
               size="sm"
               onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
               disabled={currentPage === totalPages}
+              className="px-2 sm:px-3"
             >
-              <ChevronRight className="h-4 w-4" />
+              <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4" />
             </Button>
           </div>
         </div>
@@ -637,37 +755,39 @@ export default function Notifications() {
 
       {/* Notification Dialog */}
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-[95vw] sm:max-w-md mx-2 sm:mx-0">
           <DialogHeader>
-            <DialogTitle>
+            <DialogTitle className="text-lg sm:text-xl">
               {editingNotification.id ? 'Edit Notification' : 'Send Notification'}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>Title *</Label>
+              <Label className="text-sm">Title *</Label>
               <Input
                 value={editingNotification.title || ''}
                 onChange={(e) => setEditingNotification({ ...editingNotification, title: e.target.value })}
                 placeholder="Notification title"
+                className="text-sm"
               />
             </div>
             <div className="space-y-2">
-              <Label>Message *</Label>
+              <Label className="text-sm">Message *</Label>
               <Textarea
                 value={editingNotification.message || ''}
                 onChange={(e) => setEditingNotification({ ...editingNotification, message: e.target.value })}
                 placeholder="Notification message"
                 rows={4}
+                className="text-sm"
               />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-2">
-                <Label>Type</Label>
+                <Label className="text-sm">Type</Label>
                 <select
                   value={editingNotification.type || 'info'}
                   onChange={(e) => setEditingNotification({ ...editingNotification, type: e.target.value as any })}
-                  className="w-full rounded-md border border-input bg-background px-3 py-2"
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                 >
                   <option value="info">Info</option>
                   <option value="success">Success</option>
@@ -676,11 +796,11 @@ export default function Notifications() {
                 </select>
               </div>
               <div className="space-y-2">
-                <Label>Category</Label>
+                <Label className="text-sm">Category</Label>
                 <select
                   value={editingNotification.category || 'system'}
                   onChange={(e) => setEditingNotification({ ...editingNotification, category: e.target.value as any })}
-                  className="w-full rounded-md border border-input bg-background px-3 py-2"
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                 >
                   <option value="system">System</option>
                   <option value="inventory">Inventory</option>
@@ -691,24 +811,26 @@ export default function Notifications() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Action URL (optional)</Label>
+              <Label className="text-sm">Action URL (optional)</Label>
               <Input
                 value={editingNotification.action_url || ''}
                 onChange={(e) => setEditingNotification({ ...editingNotification, action_url: e.target.value })}
                 placeholder="/admin/orders"
+                className="text-sm"
               />
             </div>
             <div className="space-y-2">
-              <Label>Action Label (optional)</Label>
+              <Label className="text-sm">Action Label (optional)</Label>
               <Input
                 value={editingNotification.action_label || ''}
                 onChange={(e) => setEditingNotification({ ...editingNotification, action_label: e.target.value })}
                 placeholder="View Orders"
+                className="text-sm"
               />
             </div>
-            <div className="flex gap-2 pt-4">
+            <div className="flex flex-col sm:flex-row gap-2 pt-4">
               <Button 
-                className="flex-1 bg-pink-600 hover:bg-pink-700 text-white"
+                className="w-full sm:flex-1 bg-pink-600 hover:bg-pink-700 text-white"
                 onClick={saveNotification}
               >
                 <Send className="h-4 w-4 mr-2" />
@@ -716,7 +838,7 @@ export default function Notifications() {
               </Button>
               <Button 
                 variant="outline" 
-                className="flex-1"
+                className="w-full sm:flex-1"
                 onClick={() => {
                   setShowDialog(false)
                   setEditingNotification({})
@@ -731,16 +853,16 @@ export default function Notifications() {
 
       {/* Delete Confirmation */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent>
+        <AlertDialogContent className="max-w-[95vw] sm:max-w-md mx-2 sm:mx-0">
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Notification?</AlertDialogTitle>
-            <AlertDialogDescription>
+            <AlertDialogTitle className="text-lg sm:text-xl">Delete Notification?</AlertDialogTitle>
+            <AlertDialogDescription className="text-sm">
               This action cannot be undone. The notification will be permanently deleted.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={deleteNotification} className="bg-red-600 hover:bg-red-700">
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+            <AlertDialogCancel className="w-full sm:w-auto">Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={deleteNotification} className="w-full sm:w-auto bg-red-600 hover:bg-red-700">
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>

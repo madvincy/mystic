@@ -770,3 +770,22 @@ div[role="dialog"] {
   background-color: hsl(222.2 84% 10%) !important;
   border-color: hsl(217.2 32.6% 25%) !important;
 }
+
+.floating-cart-btn {
+  background: linear-gradient(135deg, #db2777, #7c3aed);
+  box-shadow: 0 4px 20px rgba(219, 39, 119, 0.4);
+}
+
+.floating-cart-btn:hover {
+  box-shadow: 0 8px 30px rgba(219, 39, 119, 0.6);
+  transform: scale(1.05);
+}
+
+.floating-cart-btn:active {
+  transform: scale(0.95);
+}
+
+.floating-cart-badge {
+  background: #ef4444;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.4);
+}

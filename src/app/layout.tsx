@@ -10,6 +10,7 @@ import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import Header from "@/components/ui/Header";
 import Footer from "@/components/ui/Footer";
 import AgeVerification from "@/components/ui/AgeVerification";
+import FloatingCartButton from "@/components/ui/FloatingCartButton";
 
 const geist = Syne({ subsets: ["latin"] });
 
@@ -58,6 +59,7 @@ export default function RootLayout({
                 <Header />
                 <main className="min-h-screen pt-20">{children}</main>
                 <Footer />
+                <FloatingCartButton />
                 <Toaster
                   position="top-right"
                   richColors

@@ -159,6 +159,19 @@ export default function ProductManagement() {
     if (data) setCategories(data);
   };
 
+   useEffect(() => {
+    const checkMobile = () => {
+      const mobile = window.innerWidth < 768
+      setViewMode(mobile ? 'grid' : 'table')
+    }
+
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
+
+
   const deleteProduct = async () => {
     if (!productToDelete) return;
     try {
