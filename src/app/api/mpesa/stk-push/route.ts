@@ -94,8 +94,7 @@ export async function POST(request: Request) {
 
     // ✅ Get callback URL
     const baseUrl = process.env.MPESA_CALLBACK_URL || 
-                    process.env.NEXT_PUBLIC_APP_URL || 
-                    process.env.NGROK_URL
+                    process.env.NEXT_PUBLIC_APP_URL
 
     if (!baseUrl) {
       return NextResponse.json(
