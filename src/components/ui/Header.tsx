@@ -627,10 +627,10 @@ export default function Header() {
               </div>
 
               {/* ✅ Cart - Visible on all screen sizes */}
-              {/* <Button
+              <Button
                 variant="ghost"
                 size="icon"
-                className="rounded-full relative"
+                className="hidden md:block rounded-full relative"
                 onClick={handleCartToggle}
               >
                 <ShoppingBag className="h-5 w-5" />
@@ -643,7 +643,7 @@ export default function Header() {
                     {itemCount}
                   </motion.span>
                 )}
-              </Button> */}
+              </Button>
 
               {/* ✅ Mobile Menu Toggle - Only visible on mobile */}
               <Button
