@@ -115,7 +115,7 @@ export default function CheckoutPage() {
   useEffect(() => {
     if (user) {
       const userPhone = user.phone || user.user_metadata?.phone || "";
-      const userName = user.user_metadata?.name || user.name || "";
+      const userName = user.user_metadata?.name || "";
       const userEmail = user.email || "";
       const userAddress = user.user_metadata?.address || "";
       const userCity = user.user_metadata?.city || "Ongata Rongai";
