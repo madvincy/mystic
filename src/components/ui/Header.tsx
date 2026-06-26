@@ -555,6 +555,37 @@ export default function Header() {
                 {mounted && <ThemeToggle />}
               </div>
 
+              {/* ✅ Wishlist - Hidden on mobile (already in mobile menu) */}
+              <div className="hidden md:block">
+                <Link href="/wishlist">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="rounded-full relative"
+                  >
+                    <Heart className="h-5 w-5" />
+                  </Button>
+                </Link>
+              </div>
+
+              {/* ✅ Cart - Visible on all screen sizes */}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="hidden md:block rounded-full relative"
+                onClick={handleCartToggle}
+              >
+                <ShoppingBag className="h-5 w-5" />
+                {itemCount > 0 && (
+                  <motion.span
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    className="absolute -top-1 -right-1 h-5 w-5 bg-pink-600 text-white text-xs rounded-full flex items-center justify-center"
+                  >
+                    {itemCount}
+                  </motion.span>
+                )}
+              </Button>
               {/* ✅ User - Hidden on mobile (already in mobile menu) */}
               <div className="hidden md:block relative group">
                 <Link href={user ? "/profile" : "/auth/login"}>
@@ -612,38 +643,6 @@ export default function Header() {
                   </div>
                 )}
               </div>
-
-              {/* ✅ Wishlist - Hidden on mobile (already in mobile menu) */}
-              <div className="hidden md:block">
-                <Link href="/wishlist">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="rounded-full relative"
-                  >
-                    <Heart className="h-5 w-5" />
-                  </Button>
-                </Link>
-              </div>
-
-              {/* ✅ Cart - Visible on all screen sizes */}
-              <Button
-                variant="ghost"
-                size="icon"
-                className="hidden md:block rounded-full relative"
-                onClick={handleCartToggle}
-              >
-                <ShoppingBag className="h-5 w-5" />
-                {itemCount > 0 && (
-                  <motion.span
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    className="absolute -top-1 -right-1 h-5 w-5 bg-pink-600 text-white text-xs rounded-full flex items-center justify-center"
-                  >
-                    {itemCount}
-                  </motion.span>
-                )}
-              </Button>
 
               {/* ✅ Mobile Menu Toggle - Only visible on mobile */}
               <Button
