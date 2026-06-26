@@ -1,7 +1,7 @@
 // src/app/checkout/page.tsx
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useDispatch, useSelector } from "react-redux";
 import { RootState } from "@/lib/store";
@@ -27,8 +27,13 @@ import {
   Info,
   Search,
   X,
-  Map,
   Navigation,
+  Map,
+  Home,
+  Building,
+  LocateFixed,
+  AlertCircle,
+  AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase/client";
@@ -38,28 +43,64 @@ import { motion, AnimatePresence } from "framer-motion";
 import { downloadReceipt } from "@/lib/utils/receipt";
 import Image from "next/image";
 
+// ✅ Nairobi bounds for location restrictions
+const NAIROBI_BOUNDS = {
+  north: -1.15,
+  south: -1.45,
+  west: 36.65,
+  east: 37.10,
+};
+
+// ✅ Nairobi area coordinates
+const NAIROBI_CENTER = {
+  lat: -1.2921,
+  lng: 36.8219,
+};
+
 interface PaymentStatus {
-  status: 'idle' | 'pending' | 'processing' | 'success' | 'failed' | 'cancelled';
+  status: 'idle' | 'pending' | 'processing' | 'success' | 'failed' | 'cancelled' | 'insufficient_funds';
   message: string;
   checkoutRequestId?: string;
   merchantRequestId?: string;
   transactionId?: string;
+  resultCode?: string;
+  resultDesc?: string;
 }
 
-interface LocationSuggestion {
+interface PlacePrediction {
   place_id: string;
-  display_name: string;
-  lat: string;
-  lon: string;
-  address: {
-    road?: string;
-    suburb?: string;
-    city?: string;
-    town?: string;
-    state?: string;
-    country?: string;
-    postcode?: string;
+  description: string;
+  structured_formatting: {
+    main_text: string;
+    secondary_text: string;
   };
+  terms: Array<{
+    offset: number;
+    value: string;
+  }>;
+}
+
+interface PlaceDetails {
+  place_id: string;
+  formatted_address: string;
+  geometry: {
+    location: {
+      lat: () => number;
+      lng: () => number;
+    };
+  };
+  address_components: Array<{
+    long_name: string;
+    short_name: string;
+    types: string[];
+  }>;
+}
+
+declare global {
+  interface Window {
+    google: any;
+    initGoogleMaps: () => void;
+  }
 }
 
 export default function CheckoutPage() {
@@ -78,38 +119,90 @@ export default function CheckoutPage() {
   const [differentPhone, setDifferentPhone] = useState("");
   const [phoneError, setPhoneError] = useState("");
   const [isCartEmpty, setIsCartEmpty] = useState(false);
+  const [hasCheckedCart, setHasCheckedCart] = useState(false);
   
   // Location states
   const [searchQuery, setSearchQuery] = useState("");
-  const [locationSuggestions, setLocationSuggestions] = useState<LocationSuggestion[]>([]);
+  const [placePredictions, setPlacePredictions] = useState<PlacePrediction[]>([]);
   const [showLocationSearch, setShowLocationSearch] = useState(false);
-  const [selectedLocation, setSelectedLocation] = useState<LocationSuggestion | null>(null);
+  const [selectedPlace, setSelectedPlace] = useState<PlaceDetails | null>(null);
   const [isSearchingLocation, setIsSearchingLocation] = useState(false);
   const [saveAsDefaultAddress, setSaveAsDefaultAddress] = useState(false);
   const [addressUpdated, setAddressUpdated] = useState(false);
+  const [googleMapsLoaded, setGoogleMapsLoaded] = useState(false);
+  const [isLoadingLocation, setIsLoadingLocation] = useState(false);
   
   const paymentCheckInterval = useRef<NodeJS.Timeout | null>(null);
-  const searchTimeout = useRef<NodeJS.Timeout | null>(null);
+  const autocompleteService = useRef<any>(null);
+  const placesService = useRef<any>(null);
+  const geocoder = useRef<any>(null);
 
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     phone: "",
     address: "",
-    city: "Ongata Rongai",
+    city: "Nairobi",
     country: "Kenya",
     latitude: "",
     longitude: "",
   });
 
-  // Check if cart has items
+  // ✅ Load Google Maps script
   useEffect(() => {
-    if (items.length === 0) {
-      setIsCartEmpty(true);
-    } else {
-      setIsCartEmpty(false);
+    const loadGoogleMaps = () => {
+      const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+      
+      if (!apiKey) {
+        console.warn('Google Maps API key not found. Location search will be disabled.');
+        return;
+      }
+
+      if (window.google) {
+        setGoogleMapsLoaded(true);
+        initGoogleServices();
+        return;
+      }
+
+      const script = document.createElement('script');
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places,geocoding&callback=initGoogleMaps`;
+      script.async = true;
+      script.defer = true;
+      
+      window.initGoogleMaps = () => {
+        setGoogleMapsLoaded(true);
+        initGoogleServices();
+      };
+      
+      document.head.appendChild(script);
+    };
+
+    const initGoogleServices = () => {
+      if (window.google) {
+        autocompleteService.current = new window.google.maps.places.AutocompleteService();
+        placesService.current = new window.google.maps.places.PlacesService(document.createElement('div'));
+        geocoder.current = new window.google.maps.Geocoder();
+      }
+    };
+
+    loadGoogleMaps();
+  }, []);
+
+  // ✅ Check if cart has items - with proper handling
+  useEffect(() => {
+    if (!hasCheckedCart) {
+      if (items.length === 0) {
+        setIsCartEmpty(true);
+        // Only redirect if not loading and not in the middle of a payment
+        if (!isLoading && paymentStatus.status === 'idle') {
+          router.push("/cart");
+        }
+      } else {
+        setIsCartEmpty(false);
+      }
+      setHasCheckedCart(true);
     }
-  }, [items]);
+  }, [items, hasCheckedCart, isLoading, paymentStatus.status, router]);
 
   // Load user data when available
   useEffect(() => {
@@ -118,7 +211,7 @@ export default function CheckoutPage() {
       const userName = user.user_metadata?.name || "";
       const userEmail = user.email || "";
       const userAddress = user.user_metadata?.address || "";
-      const userCity = user.user_metadata?.city || "Ongata Rongai";
+      const userCity = user.user_metadata?.city || "Nairobi";
       
       setFormData((prev) => ({
         ...prev,
@@ -127,6 +220,8 @@ export default function CheckoutPage() {
         phone: userPhone || prev.phone,
         address: userAddress || prev.address,
         city: userCity || prev.city,
+        latitude: user.user_metadata?.latitude || "",
+        longitude: user.user_metadata?.longitude || "",
       }));
       
       if (userPhone) {
@@ -141,18 +236,8 @@ export default function CheckoutPage() {
       if (paymentCheckInterval.current) {
         clearInterval(paymentCheckInterval.current);
       }
-      if (searchTimeout.current) {
-        clearTimeout(searchTimeout.current);
-      }
     };
   }, []);
-
-  // Redirect to cart only if empty and not loading
-  useEffect(() => {
-    if (isCartEmpty && !isLoading) {
-      router.push("/cart");
-    }
-  }, [isCartEmpty, isLoading, router]);
 
   const validatePhone = (phone: string): boolean => {
     const isValid = isValidMpesaPhone(phone);
@@ -164,108 +249,263 @@ export default function CheckoutPage() {
     return true;
   };
 
-  // ✅ Search location using OpenStreetMap Nominatim
-  const searchLocation = async (query: string) => {
-    if (!query || query.length < 3) {
-      setLocationSuggestions([]);
+  // ✅ Search location using Google Places Autocomplete with Nairobi restrictions
+  const searchLocation = useCallback(async (query: string) => {
+    if (!query || query.length < 2 || !googleMapsLoaded || !autocompleteService.current) {
+      setPlacePredictions([]);
       return;
     }
 
     setIsSearchingLocation(true);
     try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}, Kenya&format=json&addressdetails=1&limit=5`,
-        {
-          headers: {
-            'Accept': 'application/json',
-            'User-Agent': 'MysticWines App',
-          },
-        }
-      );
-      
-      const data = await response.json();
-      
-      const suggestions: LocationSuggestion[] = data.map((item: any) => ({
-        place_id: item.place_id,
-        display_name: item.display_name,
-        lat: item.lat,
-        lon: item.lon,
-        address: {
-          road: item.address?.road || '',
-          suburb: item.address?.suburb || '',
-          city: item.address?.city || item.address?.town || '',
-          town: item.address?.town || '',
-          state: item.address?.state || '',
-          country: item.address?.country || 'Kenya',
-          postcode: item.address?.postcode || '',
+      const request = {
+        input: query,
+        componentRestrictions: { country: 'ke' },
+        types: ['geocode', 'establishment'],
+        locationBias: {
+          bounds: {
+            north: NAIROBI_BOUNDS.north,
+            south: NAIROBI_BOUNDS.south,
+            east: NAIROBI_BOUNDS.east,
+            west: NAIROBI_BOUNDS.west,
+          }
         },
-      }));
-      
-      setLocationSuggestions(suggestions);
+      };
+
+      const response = await new Promise((resolve, reject) => {
+        autocompleteService.current.getPlacePredictions(request, (predictions: any, status: any) => {
+          if (status === window.google.maps.places.PlacesServiceStatus.OK) {
+            resolve(predictions);
+          } else {
+            reject(status);
+          }
+        });
+      });
+
+      // ✅ Filter predictions to ensure they are within Nairobi bounds
+      const filteredPredictions = (response as any[]).filter((prediction) => {
+        const terms = prediction.terms.map((t: any) => t.value.toLowerCase());
+        const isNairobi = terms.some((term: string) => 
+          term.includes('nairobi') || 
+          term.includes('ongata rongai') ||
+          term.includes('karen') ||
+          term.includes('langata') ||
+          term.includes('thika') ||
+          term.includes('kiambu') ||
+          term.includes('kikuyu')
+        );
+        return isNairobi;
+      });
+
+      setPlacePredictions(filteredPredictions || []);
     } catch (error) {
       console.error('Error searching location:', error);
-      toast.error('Failed to search location');
     } finally {
       setIsSearchingLocation(false);
     }
-  };
+  }, [googleMapsLoaded]);
 
-  // ✅ Handle location search input with debounce
-  const handleLocationSearch = (value: string) => {
-    setSearchQuery(value);
-    
-    if (searchTimeout.current) {
-      clearTimeout(searchTimeout.current);
+  // ✅ Get place details
+  const getPlaceDetails = useCallback(async (placeId: string): Promise<PlaceDetails | null> => {
+    if (!googleMapsLoaded || !placesService.current) return null;
+
+    try {
+      const request = {
+        placeId: placeId,
+        fields: ['formatted_address', 'geometry', 'address_components', 'place_id'],
+      };
+
+      const response = await new Promise((resolve, reject) => {
+        placesService.current.getDetails(request, (place: any, status: any) => {
+          if (status === window.google.maps.places.PlacesServiceStatus.OK) {
+            resolve(place);
+          } else {
+            reject(status);
+          }
+        });
+      });
+
+      return response as PlaceDetails;
+    } catch (error) {
+      console.error('Error getting place details:', error);
+      return null;
     }
-    
-    searchTimeout.current = setTimeout(() => {
-      searchLocation(value);
-    }, 500);
-  };
+  }, [googleMapsLoaded]);
 
   // ✅ Select a location
-  const selectLocation = (location: LocationSuggestion) => {
-    setSelectedLocation(location);
-    setShowLocationSearch(false);
-    setSearchQuery(location.display_name);
-    setLocationSuggestions([]);
-    
-    // ✅ Update form data with selected location
-    const addressParts = [
-      location.address?.road,
-      location.address?.suburb,
-      location.address?.city || location.address?.town,
-    ].filter(Boolean);
-    
-    const city = location.address?.city || location.address?.town || '';
-    const country = location.address?.country || 'Kenya';
-    
-    setFormData(prev => ({
-      ...prev,
-      address: addressParts.join(', ') || location.display_name,
-      city: city,
-      country: country,
-      latitude: location.lat,
-      longitude: location.lon,
-    }));
-    
-    setAddressUpdated(true);
-    toast.success('Location selected successfully!');
-  };
+  const selectLocation = useCallback(async (prediction: PlacePrediction) => {
+    setIsLoadingLocation(true);
+    try {
+      const placeDetails = await getPlaceDetails(prediction.place_id);
+      
+      if (!placeDetails) {
+        toast.error('Could not get location details. Please try again.');
+        return;
+      }
+
+      setSelectedPlace(placeDetails);
+      setShowLocationSearch(false);
+      setSearchQuery(prediction.description);
+      setPlacePredictions([]);
+
+      const addressComponents = placeDetails.address_components || [];
+      const getComponent = (type: string) => {
+        const component = addressComponents.find((c) => c.types.includes(type));
+        return component?.long_name || '';
+      };
+
+      const streetNumber = getComponent('street_number');
+      const route = getComponent('route');
+      const city = getComponent('locality') || getComponent('administrative_area_level_2') || 'Nairobi';
+      const country = getComponent('country') || 'Kenya';
+      
+      const streetAddress = [streetNumber, route].filter(Boolean).join(' ') || placeDetails.formatted_address;
+
+      const lat = placeDetails.geometry.location.lat();
+      const lng = placeDetails.geometry.location.lng();
+      
+      const isWithinNairobi = 
+        lat >= NAIROBI_BOUNDS.south && 
+        lat <= NAIROBI_BOUNDS.north &&
+        lng >= NAIROBI_BOUNDS.west && 
+        lng <= NAIROBI_BOUNDS.east;
+
+      if (!isWithinNairobi) {
+        toast.warning('This location is outside Nairobi. Please select a location within Nairobi and its environs.');
+      }
+
+      setFormData(prev => ({
+        ...prev,
+        address: streetAddress || placeDetails.formatted_address,
+        city: city,
+        country: country,
+        latitude: lat.toString(),
+        longitude: lng.toString(),
+      }));
+      
+      setAddressUpdated(true);
+      toast.success('Location selected successfully!');
+    } catch (error) {
+      console.error('Error selecting location:', error);
+      toast.error('Failed to select location. Please try again.');
+    } finally {
+      setIsLoadingLocation(false);
+    }
+  }, [getPlaceDetails]);
+
+  // ✅ Detect current location
+  const detectCurrentLocation = useCallback(() => {
+    if (!navigator.geolocation) {
+      toast.error('Geolocation is not supported by your browser');
+      return;
+    }
+
+    setIsLoadingLocation(true);
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        
+        const isWithinNairobi = 
+          latitude >= NAIROBI_BOUNDS.south && 
+          latitude <= NAIROBI_BOUNDS.north &&
+          longitude >= NAIROBI_BOUNDS.west && 
+          longitude <= NAIROBI_BOUNDS.east;
+
+        if (!isWithinNairobi) {
+          toast.warning('You are outside Nairobi. Please enter a Nairobi location manually.');
+          setIsLoadingLocation(false);
+          return;
+        }
+
+        try {
+          const response = await new Promise((resolve, reject) => {
+            geocoder.current.geocode({
+              location: { lat: latitude, lng: longitude },
+              bounds: {
+                north: NAIROBI_BOUNDS.north,
+                south: NAIROBI_BOUNDS.south,
+                east: NAIROBI_BOUNDS.east,
+                west: NAIROBI_BOUNDS.west,
+              },
+            }, (results: any, status: any) => {
+              if (status === window.google.maps.GeocoderStatus.OK) {
+                resolve(results[0]);
+              } else {
+                reject(status);
+              }
+            });
+          });
+
+          const place = response as any;
+          const addressComponents = place.address_components || [];
+          const getComponent = (type: string) => {
+            const component = addressComponents.find((c: any) => c.types.includes(type));
+            return component?.long_name || '';
+          };
+
+          const streetNumber = getComponent('street_number');
+          const route = getComponent('route');
+          const city = getComponent('locality') || getComponent('administrative_area_level_2') || 'Nairobi';
+          const country = getComponent('country') || 'Kenya';
+          const streetAddress = [streetNumber, route].filter(Boolean).join(' ') || place.formatted_address;
+
+          setFormData(prev => ({
+            ...prev,
+            address: streetAddress || place.formatted_address,
+            city: city,
+            country: country,
+            latitude: latitude.toString(),
+            longitude: longitude.toString(),
+          }));
+          
+          setAddressUpdated(true);
+          setSearchQuery(place.formatted_address);
+          toast.success('Current location detected!');
+        } catch (error) {
+          console.error('Error getting location:', error);
+          toast.error('Failed to get current location');
+        } finally {
+          setIsLoadingLocation(false);
+        }
+      },
+      () => {
+        toast.error('Unable to get current location. Please enable location services or enter address manually.');
+        setIsLoadingLocation(false);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0,
+      }
+    );
+  }, []);
 
   // ✅ Clear selected location
-  const clearSelectedLocation = () => {
-    setSelectedLocation(null);
+  const clearSelectedLocation = useCallback(() => {
+    setSelectedPlace(null);
     setSearchQuery('');
     setAddressUpdated(false);
+    setPlacePredictions([]);
     setFormData(prev => ({
       ...prev,
       address: '',
-      city: '',
+      city: 'Nairobi',
       latitude: '',
       longitude: '',
     }));
-  };
+  }, []);
+
+  // ✅ Handle location search input with debounce
+  const handleLocationSearch = useCallback((value: string) => {
+    setSearchQuery(value);
+    if (value.length > 2) {
+      searchLocation(value);
+      setShowLocationSearch(true);
+    } else {
+      setPlacePredictions([]);
+      setShowLocationSearch(false);
+    }
+  }, [searchLocation]);
 
   const createOrder = async () => {
     const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
@@ -303,7 +543,6 @@ export default function CheckoutPage() {
       throw new Error(orderError.message || "Failed to create order");
     }
 
-    // Create order items
     const orderItems = items.map((item) => ({
       order_id: order.id,
       product_id: item.productId,
@@ -320,7 +559,6 @@ export default function CheckoutPage() {
       throw new Error(itemsError.message || "Failed to create order items");
     }
 
-    // ✅ Save address as default if checked
     if (saveAsDefaultAddress && user) {
       await supabase
         .from("users")
@@ -362,6 +600,50 @@ export default function CheckoutPage() {
       }
 
       const data = result.data;
+      
+      // ✅ Check for insufficient funds or other errors
+      if (data.ResultCode === "1" && data.ResultDesc) {
+        // Check if it's insufficient funds
+        if (data.ResultDesc.toLowerCase().includes('insufficient')) {
+          setPaymentStatus({
+            status: 'insufficient_funds',
+            message: 'Insufficient M-Pesa balance. Please top up your M-Pesa and try again.',
+            resultCode: data.ResultCode,
+            resultDesc: data.ResultDesc,
+            checkoutRequestId: checkoutRequestId,
+          });
+          
+          // Update order status
+          await supabase
+            .from("orders")
+            .update({ 
+              payment_status: "failed",
+              status: "failed",
+              payment_error: data.ResultDesc,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", orderId);
+
+          if (paymentCheckInterval.current) {
+            clearInterval(paymentCheckInterval.current);
+          }
+          return;
+        }
+        
+        // Other payment errors
+        setPaymentStatus({
+          status: 'failed',
+          message: data.ResultDesc || 'Payment failed. Please try again.',
+          resultCode: data.ResultCode,
+          resultDesc: data.ResultDesc,
+          checkoutRequestId: checkoutRequestId,
+        });
+        
+        if (paymentCheckInterval.current) {
+          clearInterval(paymentCheckInterval.current);
+        }
+        return;
+      }
       
       if (data.ResultCode === "0") {
         setPaymentStatus({
@@ -408,7 +690,7 @@ export default function CheckoutPage() {
       } else if (data.ResultCode === "1") {
         setPaymentStatus({
           status: 'failed',
-          message: 'Payment failed. Please try again.',
+          message: data.ResultDesc || 'Payment failed. Please try again.',
         });
         if (paymentCheckInterval.current) {
           clearInterval(paymentCheckInterval.current);
@@ -510,8 +792,8 @@ export default function CheckoutPage() {
       
       paymentCheckInterval.current = setInterval(() => {
         checkPaymentStatus(order.id, checkoutRequestId);
-      }, 5000);
-    }, 2000);
+      }, 30000);
+    }, 5000);
 
     // Timeout after 5 minutes
     setTimeout(() => {
@@ -590,26 +872,66 @@ export default function CheckoutPage() {
     if (paymentStatus.status === 'idle') return null;
 
     const statusConfig = {
-      pending: { icon: Clock, color: 'text-yellow-600', bg: 'bg-yellow-50 dark:bg-yellow-900/20' },
-      processing: { icon: Loader2, color: 'text-blue-600', bg: 'bg-blue-50 dark:bg-blue-900/20' },
-      success: { icon: CheckCircle, color: 'text-green-600', bg: 'bg-green-50 dark:bg-green-900/20' },
-      failed: { icon: XCircle, color: 'text-red-600', bg: 'bg-red-50 dark:bg-red-900/20' },
-      cancelled: { icon: XCircle, color: 'text-orange-600', bg: 'bg-orange-50 dark:bg-orange-900/20' },
+      pending: { icon: Clock, color: 'text-yellow-600', bg: 'bg-yellow-50 dark:bg-yellow-900/20', border: 'border-yellow-200 dark:border-yellow-800' },
+      processing: { icon: Loader2, color: 'text-blue-600', bg: 'bg-blue-50 dark:bg-blue-900/20', border: 'border-blue-200 dark:border-blue-800' },
+      success: { icon: CheckCircle, color: 'text-green-600', bg: 'bg-green-50 dark:bg-green-900/20', border: 'border-green-200 dark:border-green-800' },
+      failed: { icon: XCircle, color: 'text-red-600', bg: 'bg-red-50 dark:bg-red-900/20', border: 'border-red-200 dark:border-red-800' },
+      cancelled: { icon: XCircle, color: 'text-orange-600', bg: 'bg-orange-50 dark:bg-orange-900/20', border: 'border-orange-200 dark:border-orange-800' },
+      insufficient_funds: { icon: AlertTriangle, color: 'text-amber-600', bg: 'bg-amber-50 dark:bg-amber-900/20', border: 'border-amber-200 dark:border-amber-800' },
     };
 
     const config = statusConfig[paymentStatus.status as keyof typeof statusConfig];
-    const Icon = config?.icon || Info;
+    const Icon = config?.icon || AlertCircle;
+
+    // ✅ Special rendering for insufficient funds
+    if (paymentStatus.status === 'insufficient_funds') {
+      return (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className={`p-5 rounded-xl ${config?.bg} border ${config?.border}`}
+        >
+          <div className="flex items-start gap-4">
+            <div className="p-2 bg-amber-100 dark:bg-amber-900/30 rounded-full">
+              <AlertTriangle className={`h-6 w-6 ${config?.color}`} />
+            </div>
+            <div className="flex-1">
+              <h4 className="font-bold text-amber-700 dark:text-amber-400">Insufficient M-Pesa Balance</h4>
+              <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
+                {paymentStatus.message}
+              </p>
+              <p className="text-xs text-gray-500 mt-2">
+                Please top up your M-Pesa and try again, or choose a different payment method.
+              </p>
+              <div className="mt-3 flex gap-2">
+                <Button
+                  type="button"
+                  onClick={() => setPaymentStatus({ status: 'idle', message: '' })}
+                  className="bg-amber-600 hover:bg-amber-700 text-white"
+                  size="sm"
+                >
+                  Try Again
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setPaymentMethod("cash")}
+                  size="sm"
+                >
+                  Use Cash on Delivery
+                </Button>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      );
+    }
 
     return (
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
-        className={`p-4 rounded-lg ${config?.bg} border ${
-          paymentStatus.status === 'success' ? 'border-green-200 dark:border-green-800' : 
-          paymentStatus.status === 'failed' ? 'border-red-200 dark:border-red-800' :
-          paymentStatus.status === 'cancelled' ? 'border-orange-200 dark:border-orange-800' :
-          'border-blue-200 dark:border-blue-800'
-        }`}
+        className={`p-4 rounded-lg ${config?.bg} border ${config?.border}`}
       >
         <div className="flex items-start gap-3">
           <Icon className={`h-5 w-5 mt-0.5 ${config?.color} ${paymentStatus.status === 'processing' || paymentStatus.status === 'pending' ? 'animate-spin' : ''}`} />
@@ -618,6 +940,11 @@ export default function CheckoutPage() {
             {paymentStatus.checkoutRequestId && (
               <p className="text-xs text-gray-500 mt-1">
                 Reference: {paymentStatus.checkoutRequestId.slice(0, 16)}...
+              </p>
+            )}
+            {paymentStatus.resultDesc && (
+              <p className="text-xs text-red-500 mt-1">
+                Error: {paymentStatus.resultDesc}
               </p>
             )}
             {paymentStatus.status === 'pending' && (
@@ -638,8 +965,8 @@ export default function CheckoutPage() {
     );
   };
 
-  // ✅ Loading state
-  if (isCartEmpty) {
+  // ✅ Loading state - only show if cart is empty and not in payment flow
+  if (isCartEmpty && paymentStatus.status === 'idle' && !isLoading) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
@@ -739,21 +1066,20 @@ export default function CheckoutPage() {
                 
                 {/* Location Search */}
                 <div className="space-y-2">
-                  <Label>Search Location</Label>
+                  <Label>Search Location (Nairobi Area)</Label>
                   <div className="relative">
                     <div className="flex gap-2">
                       <div className="relative flex-1">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                         <Input
-                          placeholder="Search for your location (e.g., Nairobi, Westlands)"
+                          placeholder="Search for a location in Nairobi..."
                           value={searchQuery}
                           onChange={(e) => {
-                            setSearchQuery(e.target.value);
                             handleLocationSearch(e.target.value);
-                            setShowLocationSearch(true);
                           }}
                           onFocus={() => setShowLocationSearch(true)}
                           className="pl-10"
+                          disabled={!googleMapsLoaded}
                         />
                         {searchQuery && (
                           <button
@@ -768,63 +1094,21 @@ export default function CheckoutPage() {
                       <Button
                         type="button"
                         variant="outline"
-                        onClick={() => {
-                          if (navigator.geolocation) {
-                            navigator.geolocation.getCurrentPosition(
-                              async (position) => {
-                                const { latitude, longitude } = position.coords;
-                                try {
-                                  const response = await fetch(
-                                    `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&addressdetails=1`,
-                                    {
-                                      headers: {
-                                        'Accept': 'application/json',
-                                        'User-Agent': 'MysticWines App',
-                                      },
-                                    }
-                                  );
-                                  const data = await response.json();
-                                  if (data) {
-                                    const location: LocationSuggestion = {
-                                      place_id: data.place_id,
-                                      display_name: data.display_name,
-                                      lat: data.lat,
-                                      lon: data.lon,
-                                      address: {
-                                        road: data.address?.road || '',
-                                        suburb: data.address?.suburb || '',
-                                        city: data.address?.city || data.address?.town || '',
-                                        town: data.address?.town || '',
-                                        state: data.address?.state || '',
-                                        country: data.address?.country || 'Kenya',
-                                        postcode: data.address?.postcode || '',
-                                      },
-                                    };
-                                    selectLocation(location);
-                                    toast.success('Current location detected!');
-                                  }
-                                } catch (error) {
-                                  console.error('Error getting location:', error);
-                                  toast.error('Failed to get current location');
-                                }
-                              },
-                              () => {
-                                toast.error('Unable to get current location. Please enable location services.');
-                              }
-                            );
-                          } else {
-                            toast.error('Geolocation is not supported by your browser');
-                          }
-                        }}
+                        onClick={detectCurrentLocation}
+                        disabled={!googleMapsLoaded || isLoadingLocation}
                         className="shrink-0"
                       >
-                        <Navigation className="h-4 w-4" />
+                        {isLoadingLocation ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <LocateFixed className="h-4 w-4" />
+                        )}
                       </Button>
                     </div>
                     
                     {/* Location Suggestions */}
                     <AnimatePresence>
-                      {showLocationSearch && locationSuggestions.length > 0 && (
+                      {showLocationSearch && (placePredictions.length > 0 || isSearchingLocation) && (
                         <motion.div
                           initial={{ opacity: 0, y: -10 }}
                           animate={{ opacity: 1, y: 0 }}
@@ -837,23 +1121,21 @@ export default function CheckoutPage() {
                               <p className="text-sm mt-1">Searching...</p>
                             </div>
                           ) : (
-                            locationSuggestions.map((location) => (
+                            placePredictions.map((prediction) => (
                               <button
-                                key={location.place_id}
+                                key={prediction.place_id}
                                 type="button"
-                                onClick={() => selectLocation(location)}
+                                onClick={() => selectLocation(prediction)}
                                 className="w-full text-left px-4 py-3 hover:bg-pink-50 dark:hover:bg-pink-900/20 transition-colors border-b border-gray-100 dark:border-gray-700 last:border-0"
                               >
                                 <div className="flex items-start gap-3">
                                   <MapPin className="h-4 w-4 text-pink-600 mt-1 shrink-0" />
                                   <div>
                                     <p className="text-sm font-medium text-gray-900 dark:text-white">
-                                      {location.address?.road || location.display_name.split(',')[0]}
+                                      {prediction.structured_formatting.main_text}
                                     </p>
                                     <p className="text-xs text-gray-500">
-                                      {location.address?.city || location.address?.town || ''}
-                                      {location.address?.suburb && `, ${location.address.suburb}`}
-                                      {location.address?.country && `, ${location.address.country}`}
+                                      {prediction.structured_formatting.secondary_text}
                                     </p>
                                   </div>
                                 </div>
@@ -865,8 +1147,13 @@ export default function CheckoutPage() {
                     </AnimatePresence>
                   </div>
                   <p className="text-xs text-gray-500">
-                    Search for your location or use the GPS button to detect your current position
+                    Search for locations within Nairobi area or use the GPS button to detect your current location
                   </p>
+                  {!googleMapsLoaded && (
+                    <p className="text-xs text-amber-600">
+                      ⚠️ Google Maps is loading. Please wait...
+                    </p>
+                  )}
                 </div>
 
                 {/* Address Details */}
@@ -1087,7 +1374,7 @@ export default function CheckoutPage() {
               >
                 Try Again
               </Button>
-            ) : paymentStatus.status !== 'success' && (
+            ) : paymentStatus.status !== 'success' && paymentStatus.status !== 'insufficient_funds' && (
               <Button
                 type="submit"
                 className="w-full bg-pink-600 hover:bg-pink-700 text-white text-lg py-6"
