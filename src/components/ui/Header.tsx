@@ -54,10 +54,9 @@ const categoryStructure = {
     slug: "beer",
     subcategories: [
       { name: "Lager", slug: "lager" },
-      { name: "Ale", slug: "ale" },
       { name: "Stout", slug: "stout" },
-      { name: "Pilsner", slug: "pilsner" },
       { name: "Craft Beer", slug: "craft-beer" },
+      { name: "Cider", slug: "cider" },
       { name: "Imported Beer", slug: "imported-beer" },
     ],
   },
@@ -81,7 +80,7 @@ const categoryStructure = {
 const otherCategories = [
   { name: "Energy Drinks", slug: "energy-drinks" },
   { name: "Merchandise", slug: "merchandise" },
-  { name: "Vermouth & Shooters", slug: "vermouth-shooters" },
+  { name: "Cigarattes", slug: "Vape" },
   { name: "Gift Sets", slug: "gifts" },
   { name: "Accessories", slug: "accessories" },
 ];
@@ -171,9 +170,8 @@ export default function Header() {
       Beer: [
         "beer",
         "lager",
-        "ale",
+        "cider",
         "stout",
-        "pilsner",
         "craft-beer",
         "imported-beer",
       ],

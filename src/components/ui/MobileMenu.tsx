@@ -83,9 +83,10 @@ const categoryStructure = {
 const otherCategories = [
   { name: 'Energy Drinks', slug: 'energy-drinks', icon: '⚡' },
   { name: 'Merchandise', slug: 'merchandise', icon: '👕' },
-  { name: 'Vermouth & Shooters', slug: 'vermouth-shooters', icon: '🍸' },
+  { name: 'Cigarattes', slug: 'cigarattes & Vapes', icon: '🚬' },
   { name: 'Gift Sets', slug: 'gifts', icon: '🎁' },
-  { name: 'Accessories', slug: 'accessories', icon: '🛍️' },
+  { name: 'Jaba Juice', slug: 'nicotine', icon: '🥤' },
+  { name: 'Accessories', slug: 'extras', icon: '🛍️' }
 ]
 
 export default function MobileMenu({ isOpen, onClose, className = '' }: MobileMenuProps) {
