@@ -30,67 +30,108 @@ export async function POST(request: Request) {
       )
     }
 
-    // ✅ Get access token
-    const auth = Buffer.from(
-      `${process.env.MPESA_CONSUMER_KEY}:${process.env.MPESA_CONSUMER_SECRET}`
-    ).toString('base64')
+    // ✅ Get credentials
+    const consumerKey = process.env.MPESA_CONSUMER_KEY?.trim()
+    const consumerSecret = process.env.MPESA_CONSUMER_SECRET?.trim()
+    const shortcode = process.env.MPESA_SHORTCODE?.trim() || '174379'
+    const passkey = process.env.MPESA_PASSKEY?.trim()
 
-    const tokenResponse = await axios.get(
-      'https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials',
-      {
-        headers: {
-          Authorization: `Basic ${auth}`,
+    if (!consumerKey || !consumerSecret) {
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: 'M-Pesa credentials not configured'
         },
-      }
-    )
+        { status: 500 }
+      )
+    }
 
-    const accessToken = tokenResponse.data.access_token
+    // ✅ Get access token
+    const authBase64 = Buffer.from(`${consumerKey}:${consumerSecret}`).toString('base64')
+
+    let accessToken: string
+    try {
+      const tokenResponse = await axios({
+        method: 'GET',
+        url: 'https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials',
+        headers: {
+          'Authorization': `Basic ${authBase64}`,
+          'Content-Type': 'application/json',
+        },
+        timeout: 30000,
+      })
+
+      accessToken = tokenResponse.data.access_token
+      
+      if (!accessToken) {
+        throw new Error('No access token received')
+      }
+      
+    } catch (tokenError: any) {
+      console.error('Failed to get access token:', tokenError.response?.data || tokenError.message)
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: 'Failed to authenticate with M-Pesa',
+          details: tokenError.response?.data || tokenError.message
+        },
+        { status: 500 }
+      )
+    }
 
     // ✅ Generate timestamp
-    const timestamp = new Date()
-      .toISOString()
-      .replace(/[^0-9]/g, '')
-      .slice(0, 14)
+    const now = new Date()
+    const timestamp = 
+      now.getFullYear() +
+      String(now.getMonth() + 1).padStart(2, '0') +
+      String(now.getDate()).padStart(2, '0') +
+      String(now.getHours()).padStart(2, '0') +
+      String(now.getMinutes()).padStart(2, '0') +
+      String(now.getSeconds()).padStart(2, '0')
 
     // ✅ Generate password
-    const password = Buffer.from(
-      `${process.env.MPESA_SHORTCODE}${process.env.MPESA_PASSKEY}${timestamp}`
-    ).toString('base64')
+    const password = Buffer.from(`${shortcode}${passkey}${timestamp}`).toString('base64')
 
     // ✅ Get callback URL
-    const baseUrl = process.env.MPESA_CALLBACK_URL?.replace(/\/$/, '') || 'http://localhost:3000'
-    const callbackUrl = `${baseUrl}/api/mpesa/callback`
+    const baseUrl = process.env.MPESA_CALLBACK_URL || 
+                    process.env.NEXT_PUBLIC_APP_URL || 
+                    process.env.NGROK_URL
 
-    console.log('📝 M-Pesa Request:')
-    console.log('  - Original Phone:', phoneNumber)
-    console.log('  - Formatted Phone:', formattedPhone)
-    console.log('  - Amount:', amount)
-    console.log('  - Callback URL:', callbackUrl)
+    if (!baseUrl) {
+      return NextResponse.json(
+        { success: false, error: 'Callback URL not configured' },
+        { status: 500 }
+      )
+    }
 
-    // ✅ STK Push request
-    const stkResponse = await axios.post(
-      'https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest',
-      {
-        BusinessShortCode: process.env.MPESA_SHORTCODE,
-        Password: password,
-        Timestamp: timestamp,
-        TransactionType: 'CustomerPayBillOnline',
-        Amount: Math.round(amount),
-        PartyA: formattedPhone,
-        PartyB: process.env.MPESA_SHORTCODE,
-        PhoneNumber: formattedPhone,
-        CallBackURL: callbackUrl,
-        AccountReference: orderId,
-        TransactionDesc: `Payment for order ${orderId}`,
+    const callbackUrl = `${baseUrl.replace(/\/+$/, '')}/api/mpesa/callback`
+
+    // ✅ Prepare STK Push payload
+    const stkPayload = {
+      BusinessShortCode: shortcode,
+      Password: password,
+      Timestamp: timestamp,
+      TransactionType: 'CustomerPayBillOnline',
+      Amount: Math.round(amount),
+      PartyA: formattedPhone,
+      PartyB: shortcode,
+      PhoneNumber: formattedPhone,
+      CallBackURL: callbackUrl,
+      AccountReference: orderId,
+      TransactionDesc: `Payment for order ${orderId}`,
+    }
+
+    // ✅ Send STK Push
+    const stkResponse = await axios({
+      method: 'POST',
+      url: 'https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest',
+      data: stkPayload,
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
       },
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      }
-    )
-
-    console.log('✅ M-Pesa STK Push sent:', stkResponse.data)
+      timeout: 30000,
+    })
 
     return NextResponse.json({
       success: true,
@@ -99,7 +140,7 @@ export async function POST(request: Request) {
     })
 
   } catch (error: any) {
-    console.error('❌ M-Pesa error:', error.response?.data || error.message)
+    console.error('M-Pesa error:', error.response?.data || error.message)
     
     return NextResponse.json(
       { 
@@ -107,7 +148,7 @@ export async function POST(request: Request) {
         error: error.response?.data?.errorMessage || error.message,
         details: error.response?.data || null
       },
-      { status: 500 }
+      { status: error.response?.status || 500 }
     )
   }
 }

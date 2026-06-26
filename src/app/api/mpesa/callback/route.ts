@@ -27,32 +27,84 @@ export async function POST(request: Request) {
 
       console.log('✅ Payment successful:', { mpesaReceipt, amount, phoneNumber })
 
+      // ✅ Update order using CheckoutRequestID as reference
+      const { data: order, error: findError } = await supabase
+        .from('orders')
+        .select('id')
+        .eq('order_number', CheckoutRequestID)
+        .single()
+
+      if (findError) {
+        console.error('❌ Order not found:', findError)
+        return NextResponse.json({ ResultCode: 1, ResultDesc: 'Order not found' })
+      }
+
       // ✅ Update order
-      const { error } = await supabase
+      const { error: updateError } = await supabase
         .from('orders')
         .update({
           payment_status: 'paid',
+          status: 'processing',
           payment_receipt: mpesaReceipt,
           updated_at: new Date().toISOString(),
         })
-        .eq('order_number', CheckoutRequestID)
+        .eq('id', order.id)
 
-      if (error) {
-        console.error('❌ Error updating order:', error)
+      if (updateError) {
+        console.error('❌ Error updating order:', updateError)
         return NextResponse.json({ ResultCode: 1, ResultDesc: 'Error updating order' })
       }
+
+      // ✅ Log payment
+      await supabase
+        .from('payment_logs')
+        .insert({
+          order_id: order.id,
+          payment_method: 'mpesa',
+          amount: amount,
+          transaction_id: mpesaReceipt,
+          status: 'completed',
+          metadata: { 
+            merchantRequestId: MerchantRequestID,
+            checkoutRequestId: CheckoutRequestID,
+            phoneNumber,
+          },
+        })
 
       return NextResponse.json({ ResultCode: 0, ResultDesc: 'Success' })
     } else {
       console.error('❌ Payment failed:', ResultDesc)
 
-      await supabase
+      // ✅ Update order status
+      const { data: order } = await supabase
         .from('orders')
-        .update({
-          payment_status: 'failed',
-          updated_at: new Date().toISOString(),
-        })
+        .select('id')
         .eq('order_number', CheckoutRequestID)
+        .single()
+
+      if (order) {
+        await supabase
+          .from('orders')
+          .update({
+            payment_status: 'failed',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', order.id)
+
+        await supabase
+          .from('payment_logs')
+          .insert({
+            order_id: order.id,
+            payment_method: 'mpesa',
+            amount: 0,
+            status: 'failed',
+            metadata: { 
+              resultCode: ResultCode,
+              resultDesc: ResultDesc,
+              checkoutRequestId: CheckoutRequestID,
+            },
+          })
+      }
 
       return NextResponse.json({ ResultCode: ResultCode, ResultDesc: ResultDesc })
     }
