@@ -510,8 +510,8 @@ export default function CheckoutPage() {
       
       paymentCheckInterval.current = setInterval(() => {
         checkPaymentStatus(order.id, checkoutRequestId);
-      }, 30000);
-    }, 5000);
+      }, 5000);
+    }, 2000);
 
     // Timeout after 5 minutes
     setTimeout(() => {
