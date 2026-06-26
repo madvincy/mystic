@@ -233,7 +233,10 @@ export default function AdSlider({
     return (
       <div
         className={cn(
-          "relative bg-gray-200 dark:bg-gray-800 aspect-[16/6] max-h-[400px] animate-pulse",
+          "relative bg-gray-200 dark:bg-gray-800",
+          // ✅ Mobile: taller aspect ratio, Desktop: standard
+          "aspect-[4/3] sm:aspect-[16/6]",
+          "min-h-[300px] sm:min-h-[200px] md:min-h-[300px] lg:min-h-[400px] max-h-[500px] sm:max-h-[400px]",
           fullWidth
             ? "w-screen relative left-1/2 -translate-x-1/2"
             : "rounded-xl",
@@ -247,7 +250,11 @@ export default function AdSlider({
     return (
       <div
         className={cn(
-          "relative overflow-hidden bg-gray-100 dark:bg-gray-800 aspect-[16/6] max-h-[400px] flex items-center justify-center",
+          "relative overflow-hidden bg-gray-100 dark:bg-gray-800",
+          // ✅ Mobile: taller aspect ratio, Desktop: standard
+          "aspect-[4/3] sm:aspect-[16/6]",
+          "min-h-[300px] sm:min-h-[200px] md:min-h-[300px] lg:min-h-[400px] max-h-[500px] sm:max-h-[400px]",
+          "flex items-center justify-center",
           fullWidth ? "w-full -mx-4 sm:-mx-6 lg:-mx-8" : "rounded-xl",
           className
         )}
@@ -259,10 +266,8 @@ export default function AdSlider({
     );
   }
 
-  // ✅ Define currentAd BEFORE getAdProducts
   const currentAd = ads[currentIndex];
 
-  // ✅ getAdProducts now has access to currentAd
   const getAdProducts = () => {
     if (!currentAd) return [];
     
@@ -297,7 +302,17 @@ export default function AdSlider({
         className
       )}
     >
-      <div className="relative w-full aspect-[16/6] max-h-[600px]">
+      <div 
+        className={cn(
+          "relative w-full",
+          // ✅ Mobile: taller aspect ratio (4:3), Desktop: widescreen (16:6)
+          "aspect-[4/3] sm:aspect-[16/6]",
+          // ✅ Minimum heights for different screen sizes
+          "min-h-[350px] sm:min-h-[250px] md:min-h-[350px] lg:min-h-[450px]",
+          // ✅ Maximum heights to prevent overflow
+          "max-h-[500px] sm:max-h-[450px] md:max-h-[500px] lg:max-h-[600px]"
+        )}
+      >
         <AnimatePresence mode="wait">
           <motion.div
             key={currentIndex}
@@ -318,11 +333,11 @@ export default function AdSlider({
 
             {/* Overlay Content */}
             <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/40 to-transparent flex items-center">
-              <div className="px-4 md:px-12 max-w-4xl w-full">
+              <div className="px-3 sm:px-6 md:px-12 max-w-4xl w-full">
                 {currentAd.display_type !== "custom" && adProducts.length > 0 ? (
-                  // ✅ Product Display Mode - Larger Cards
-                  <div className="space-y-4">
-                    <Badge className="bg-pink-600 text-white border-0 text-base px-5 py-1.5">
+                  // ✅ Product Display Mode - Responsive Cards
+                  <div className="space-y-2 sm:space-y-4">
+                    <Badge className="bg-pink-600 text-white border-0 text-xs sm:text-base px-3 sm:px-5 py-1 sm:py-1.5">
                       {currentAd.display_type === "product"
                         ? "🌟 Featured Product"
                         : currentAd.display_type === "multiple_products"
@@ -332,15 +347,15 @@ export default function AdSlider({
                         : `📁 ${currentAd.title || "Subcategory"} Selection`}
                     </Badge>
 
-                    {/* ✅ Larger Grid - 3 columns with bigger cards */}
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    {/* ✅ Responsive Grid - 1 column on mobile, 3 on desktop */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 sm:gap-4">
                       {adProducts.slice(0, 6).map((product, idx) => (
                         <motion.div
                           key={product.id}
                           initial={{ opacity: 0, y: 20 }}
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ delay: idx * 0.1 }}
-                          className="bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm rounded-xl p-4 shadow-lg hover:shadow-2xl transition-all duration-300 hover:scale-105"
+                          className="bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm rounded-lg sm:rounded-xl p-2 sm:p-4 shadow-lg hover:shadow-2xl transition-all duration-300 hover:scale-105"
                         >
                           <Link
                             href={`/products/${product.slug}`}
@@ -356,17 +371,17 @@ export default function AdSlider({
                                 className="w-full h-full object-cover"
                               />
                             </div>
-                            <h4 className="text-sm md:text-base font-semibold mt-2 line-clamp-1 text-gray-900 dark:text-white">
+                            <h4 className="text-xs sm:text-sm md:text-base font-semibold mt-1 sm:mt-2 line-clamp-1 text-gray-900 dark:text-white">
                               {product.name}
                             </h4>
-                            <div className="flex items-center justify-between mt-1.5">
-                              <span className="text-pink-600 font-bold text-base md:text-lg">
+                            <div className="flex items-center justify-between mt-0.5 sm:mt-1.5">
+                              <span className="text-pink-600 font-bold text-xs sm:text-base md:text-lg">
                                 KSh {product.price.toLocaleString()}
                               </span>
                               {product.rating && (
                                 <div className="flex items-center gap-0.5">
-                                  <Star className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400" />
-                                  <span className="text-xs text-gray-600 dark:text-gray-400">
+                                  <Star className="h-2.5 w-2.5 sm:h-3.5 sm:w-3.5 fill-yellow-400 text-yellow-400" />
+                                  <span className="text-[10px] sm:text-xs text-gray-600 dark:text-gray-400">
                                     {product.rating}
                                   </span>
                                 </div>
@@ -375,19 +390,20 @@ export default function AdSlider({
                           </Link>
                           <Button
                             size="default"
-                            className="w-full mt-3 bg-pink-600 hover:bg-pink-700 text-white text-sm h-9"
+                            className="w-full mt-1.5 sm:mt-3 bg-pink-600 hover:bg-pink-700 text-white text-[10px] sm:text-sm h-7 sm:h-9"
                             onClick={(e) => handleAddToCart(e, product)}
                             disabled={addedProducts.has(product.id)}
                           >
                             {addedProducts.has(product.id) ? (
                               <>
-                                <Check className="h-4 w-4 mr-1.5" />
+                                <Check className="h-3 w-3 sm:h-4 sm:w-4 mr-0.5 sm:mr-1.5" />
                                 Added!
                               </>
                             ) : (
                               <>
-                                <ShoppingCart className="h-4 w-4 mr-1.5" />
-                                Add to Cart
+                                <ShoppingCart className="h-3 w-3 sm:h-4 sm:w-4 mr-0.5 sm:mr-1.5" />
+                                <span className="hidden xs:inline">Add to Cart</span>
+                                <span className="xs:hidden">Add</span>
                               </>
                             )}
                           </Button>
@@ -402,7 +418,7 @@ export default function AdSlider({
                         <Button
                           variant="secondary"
                           size="sm"
-                          className="bg-white/20 hover:bg-white/30 text-white backdrop-blur-sm text-sm"
+                          className="bg-white/20 hover:bg-white/30 text-white backdrop-blur-sm text-xs sm:text-sm"
                         >
                           View All Products →
                         </Button>
@@ -412,19 +428,19 @@ export default function AdSlider({
                 ) : (
                   // ✅ Custom Display Mode (Link Only) - Larger Text
                   <div>
-                    <Badge className="bg-pink-600 text-white border-0 text-base px-5 py-1.5 mb-4">
+                    <Badge className="bg-pink-600 text-white border-0 text-xs sm:text-base px-3 sm:px-5 py-1 sm:py-1.5 mb-2 sm:mb-4">
                       🎯 Special Offer
                     </Badge>
-                    <h3 className="text-3xl md:text-5xl font-bold text-white mb-3 leading-tight">
+                    <h3 className="text-xl sm:text-3xl md:text-5xl font-bold text-white mb-1 sm:mb-3 leading-tight">
                       {currentAd.title}
                     </h3>
                     {currentAd.description && (
-                      <p className="text-white/80 text-base md:text-lg mb-5 max-w-lg">
+                      <p className="text-white/80 text-xs sm:text-base md:text-lg mb-3 sm:mb-5 max-w-lg">
                         {currentAd.description}
                       </p>
                     )}
                     <Link href={currentAd.link_url || "#"}>
-                      <Button className="bg-white text-pink-600 hover:bg-white/90 font-semibold text-base px-8 py-6">
+                      <Button className="bg-white text-pink-600 hover:bg-white/90 font-semibold text-sm sm:text-base px-4 sm:px-8 py-3 sm:py-6">
                         {currentAd.cta_text || "Learn More"}
                       </Button>
                     </Link>
@@ -441,41 +457,41 @@ export default function AdSlider({
         <>
           <button
             onClick={goToPrev}
-            className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full transition opacity-0 group-hover:opacity-100"
+            className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-1.5 sm:p-2 rounded-full transition opacity-0 group-hover:opacity-100"
             aria-label="Previous slide"
           >
-            <ChevronLeft className="h-5 w-5" />
+            <ChevronLeft className="h-4 w-4 sm:h-5 sm:w-5" />
           </button>
           <button
             onClick={goToNext}
-            className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full transition opacity-0 group-hover:opacity-100"
+            className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-1.5 sm:p-2 rounded-full transition opacity-0 group-hover:opacity-100"
             aria-label="Next slide"
           >
-            <ChevronRight className="h-5 w-5" />
+            <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5" />
           </button>
 
           <button
             onClick={togglePause}
-            className="absolute bottom-4 left-4 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full transition opacity-0 group-hover:opacity-100"
+            className="absolute bottom-2 sm:bottom-4 left-2 sm:left-4 bg-black/50 hover:bg-black/70 text-white p-1.5 sm:p-2 rounded-full transition opacity-0 group-hover:opacity-100"
             aria-label={isPaused ? "Play" : "Pause"}
           >
-            {isPaused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
+            {isPaused ? <Play className="h-3 w-3 sm:h-4 sm:w-4" /> : <Pause className="h-3 w-3 sm:h-4 sm:w-4" />}
           </button>
         </>
       )}
 
       {/* Dots */}
       {showDots && ads.length > 1 && (
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-10">
+        <div className="absolute bottom-2 sm:bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5 sm:gap-2 z-10">
           {ads.map((_, index) => (
             <button
               key={index}
               onClick={() => goToSlide(index)}
               className={cn(
-                "h-2 rounded-full transition-all",
+                "h-1.5 sm:h-2 rounded-full transition-all",
                 index === currentIndex
-                  ? "w-6 bg-pink-600"
-                  : "w-2 bg-white/50 hover:bg-white/80"
+                  ? "w-4 sm:w-6 bg-pink-600"
+                  : "w-1.5 sm:w-2 bg-white/50 hover:bg-white/80"
               )}
               aria-label={`Go to slide ${index + 1}`}
             />
@@ -485,7 +501,7 @@ export default function AdSlider({
 
       {/* Slide Counter */}
       {ads.length > 1 && (
-        <div className="absolute bottom-4 right-4 bg-black/50 text-white text-xs px-2 py-1 rounded-full">
+        <div className="absolute bottom-2 sm:bottom-4 right-2 sm:right-4 bg-black/50 text-white text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full">
           {currentIndex + 1} / {ads.length}
         </div>
       )}

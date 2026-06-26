@@ -789,3 +789,26 @@ div[role="dialog"] {
   background: #ef4444;
   box-shadow: 0 2px 8px rgba(239, 68, 68, 0.4);
 }
+
+/* Quick fix for dialog scrollbars */
+.overflow-y-auto {
+  scrollbar-width: thin !important;
+}
+
+.overflow-y-auto::-webkit-scrollbar {
+  width: 4px !important;
+  height: 4px !important;
+}
+
+.overflow-y-auto::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb {
+  background: hsl(var(--mystic-pink) / 0.3) !important;
+  border-radius: 4px !important;
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--mystic-pink) / 0.6) !important;
+}
