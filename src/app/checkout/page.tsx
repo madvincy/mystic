@@ -48,7 +48,7 @@ const NAIROBI_BOUNDS = {
 };
 
 interface PaymentStatus {
-  status: 'idle' | 'pending' | 'processing' | 'success' | 'failed' | 'cancelled' | 'insufficient_funds';
+  status: 'idle' | 'pending' | 'processing' | 'success' | 'failed' | 'cancelled' | 'insufficient_funds' | 'invalid_credentials';
   message: string;
   checkoutRequestId?: string;
   merchantRequestId?: string;
@@ -144,11 +144,6 @@ export default function CheckoutPage() {
 
   // ✅ Handle cart redirection with proper checks
   useEffect(() => {
-    // Only redirect if:
-    // 1. Cart is empty
-    // 2. Not currently loading
-    // 3. Not in the middle of a payment flow
-    // 4. Not showing a payment status that requires user action
     const shouldRedirect = 
       !hasCartItems && 
       !isLoading && 
@@ -190,7 +185,6 @@ export default function CheckoutPage() {
 
     setIsSearchingLocation(true);
     try {
-      // ✅ Add Nairobi to the search query to restrict results
       const searchQueryWithNairobi = `${query}, Nairobi, Kenya`;
       
       const response = await fetch(
@@ -205,12 +199,10 @@ export default function CheckoutPage() {
       
       const data = await response.json();
       
-      // ✅ Filter results to ensure they are within Nairobi bounds
       const filteredSuggestions = data
         .filter((item: any) => {
           const lat = parseFloat(item.lat);
           const lon = parseFloat(item.lon);
-          // Check if location is within Nairobi bounds
           return (
             lat >= NAIROBI_BOUNDS.south &&
             lat <= NAIROBI_BOUNDS.north &&
@@ -273,7 +265,6 @@ export default function CheckoutPage() {
     setSearchQuery(location.display_name);
     setLocationSuggestions([]);
     
-    // ✅ Update form data with selected location
     const addressParts = [
       location.address?.road,
       location.address?.suburb,
@@ -308,7 +299,6 @@ export default function CheckoutPage() {
       async (position) => {
         const { latitude, longitude } = position.coords;
         
-        // ✅ Check if within Nairobi bounds
         const isWithinNairobi = 
           latitude >= NAIROBI_BOUNDS.south && 
           latitude <= NAIROBI_BOUNDS.north &&
@@ -482,47 +472,68 @@ export default function CheckoutPage() {
 
       const data = result.data;
       
-      // ✅ Check for insufficient funds or other errors
-      if (data.ResultCode === "1" && data.ResultDesc) {
-        if (data.ResultDesc.toLowerCase().includes('insufficient')) {
+      // ✅ Handle all error types
+      if (data.ResultCode !== "0" && data.ResultDesc) {
+        const errorMessage = data.ResultDesc || 'Payment failed';
+        
+        // ✅ Check for specific error types
+        if (errorMessage.toLowerCase().includes('insufficient')) {
           setPaymentStatus({
             status: 'insufficient_funds',
             message: 'Insufficient M-Pesa balance. Please top up your M-Pesa and try again.',
             resultCode: data.ResultCode,
-            resultDesc: data.ResultDesc,
+            resultDesc: errorMessage,
             checkoutRequestId: checkoutRequestId,
           });
-          
-          await supabase
-            .from("orders")
-            .update({ 
-              payment_status: "failed",
-              status: "failed",
-              payment_error: data.ResultDesc,
-              updated_at: new Date().toISOString(),
-            })
-            .eq("id", orderId);
-
-          if (paymentCheckInterval.current) {
-            clearInterval(paymentCheckInterval.current);
-          }
-          return;
+        } else if (
+          errorMessage.toLowerCase().includes('invalid') ||
+          errorMessage.toLowerCase().includes('credentials') ||
+          errorMessage.toLowerCase().includes('initiator') ||
+          errorMessage.toLowerCase().includes('authentication')
+        ) {
+          setPaymentStatus({
+            status: 'invalid_credentials',
+            message: 'Invalid M-Pesa credentials or configuration error. Please try again or contact support.',
+            resultCode: data.ResultCode,
+            resultDesc: errorMessage,
+            checkoutRequestId: checkoutRequestId,
+          });
+        } else if (data.ResultCode === "1032") {
+          setPaymentStatus({
+            status: 'cancelled',
+            message: 'Payment was cancelled. You can try again or choose another method.',
+            resultCode: data.ResultCode,
+            resultDesc: errorMessage,
+            checkoutRequestId: checkoutRequestId,
+          });
+        } else {
+          setPaymentStatus({
+            status: 'failed',
+            message: errorMessage || 'Payment failed. Please try again.',
+            resultCode: data.ResultCode,
+            resultDesc: errorMessage,
+            checkoutRequestId: checkoutRequestId,
+          });
         }
         
-        setPaymentStatus({
-          status: 'failed',
-          message: data.ResultDesc || 'Payment failed. Please try again.',
-          resultCode: data.ResultCode,
-          resultDesc: data.ResultDesc,
-          checkoutRequestId: checkoutRequestId,
-        });
-        
+        // ✅ Update order status
+        await supabase
+          .from("orders")
+          .update({ 
+            payment_status: "failed",
+            status: "failed",
+            payment_error: errorMessage,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", orderId);
+
         if (paymentCheckInterval.current) {
           clearInterval(paymentCheckInterval.current);
         }
         return;
       }
       
+      // ✅ Payment successful
       if (data.ResultCode === "0") {
         setPaymentStatus({
           status: 'success',
@@ -556,24 +567,8 @@ export default function CheckoutPage() {
         }
         
         generateReceipt(orderId);
-        
-      } else if (data.ResultCode === "1032") {
-        setPaymentStatus({
-          status: 'cancelled',
-          message: 'Payment was cancelled. You can try again or choose another method.',
-        });
-        if (paymentCheckInterval.current) {
-          clearInterval(paymentCheckInterval.current);
-        }
-      } else if (data.ResultCode === "1") {
-        setPaymentStatus({
-          status: 'failed',
-          message: data.ResultDesc || 'Payment failed. Please try again.',
-        });
-        if (paymentCheckInterval.current) {
-          clearInterval(paymentCheckInterval.current);
-        }
       } else {
+        // ✅ Any other status - keep checking
         setPaymentStatus({
           status: 'processing',
           message: 'Waiting for payment confirmation...',
@@ -712,6 +707,9 @@ export default function CheckoutPage() {
       if (paymentMethod === "mpesa") {
         await handleMpesaPayment(order);
       } else {
+        // ✅ Cash on Delivery - Clear payment status
+        setPaymentStatus({ status: 'idle', message: '' });
+        
         const message = `Hello Mystic Wines,\n\nI want to place an order:\n\n${items
           .map(
             (item) =>
@@ -721,11 +719,7 @@ export default function CheckoutPage() {
 
         const whatsappUrl = `https://wa.me/254710835445?text=${encodeURIComponent(message)}`;
         
-        setPaymentStatus({
-          status: 'success',
-          message: 'Order placed! Redirecting to WhatsApp...',
-        });
-
+        toast.success('Order placed! Redirecting to WhatsApp...');
         dispatch(clearCart());
         
         setTimeout(() => {
@@ -745,8 +739,13 @@ export default function CheckoutPage() {
     }
   };
 
-  // Render payment status
+  // Render payment status - ✅ Only show for M-Pesa payments
   const renderPaymentStatus = () => {
+    // ✅ Don't show payment status for cash payments
+    if (paymentMethod === "cash") {
+      return null;
+    }
+
     if (paymentStatus.status === 'idle') return null;
 
     const statusConfig = {
@@ -756,11 +755,13 @@ export default function CheckoutPage() {
       failed: { icon: XCircle, color: 'text-red-600', bg: 'bg-red-50 dark:bg-red-900/20', border: 'border-red-200 dark:border-red-800' },
       cancelled: { icon: XCircle, color: 'text-orange-600', bg: 'bg-orange-50 dark:bg-orange-900/20', border: 'border-orange-200 dark:border-orange-800' },
       insufficient_funds: { icon: AlertTriangle, color: 'text-amber-600', bg: 'bg-amber-50 dark:bg-amber-900/20', border: 'border-amber-200 dark:border-amber-800' },
+      invalid_credentials: { icon: AlertTriangle, color: 'text-red-600', bg: 'bg-red-50 dark:bg-red-900/20', border: 'border-red-200 dark:border-red-800' },
     };
 
     const config = statusConfig[paymentStatus.status as keyof typeof statusConfig];
     const Icon = config?.icon || AlertTriangle;
 
+    // ✅ Custom rendering for insufficient funds
     if (paymentStatus.status === 'insufficient_funds') {
       return (
         <motion.div
@@ -804,6 +805,55 @@ export default function CheckoutPage() {
       );
     }
 
+    // ✅ Custom rendering for invalid credentials
+    if (paymentStatus.status === 'invalid_credentials') {
+      return (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className={`p-5 rounded-xl ${config?.bg} border ${config?.border}`}
+        >
+          <div className="flex items-start gap-4">
+            <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-full">
+              <AlertTriangle className={`h-6 w-6 ${config?.color}`} />
+            </div>
+            <div className="flex-1">
+              <h4 className="font-bold text-red-700 dark:text-red-400">Payment Configuration Error</h4>
+              <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
+                {paymentStatus.message}
+              </p>
+              {paymentStatus.resultDesc && (
+                <p className="text-xs text-gray-500 mt-2">
+                  Error details: {paymentStatus.resultDesc}
+                </p>
+              )}
+              <p className="text-xs text-gray-500 mt-1">
+                Please try again or contact support if the issue persists.
+              </p>
+              <div className="mt-3 flex gap-2">
+                <Button
+                  type="button"
+                  onClick={() => setPaymentStatus({ status: 'idle', message: '' })}
+                  className="bg-red-600 hover:bg-red-700 text-white"
+                  size="sm"
+                >
+                  Try Again
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setPaymentMethod("cash")}
+                  size="sm"
+                >
+                  Use Cash on Delivery
+                </Button>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      );
+    }
+
     return (
       <motion.div
         initial={{ opacity: 0, y: -10 }}
@@ -819,7 +869,7 @@ export default function CheckoutPage() {
                 Reference: {paymentStatus.checkoutRequestId.slice(0, 16)}...
               </p>
             )}
-            {paymentStatus.resultDesc && (
+            {paymentStatus.resultDesc && paymentStatus.status !== 'invalid_credentials' && (
               <p className="text-xs text-red-500 mt-1">
                 Error: {paymentStatus.resultDesc}
               </p>
@@ -946,7 +996,6 @@ export default function CheckoutPage() {
                   Delivery Address (Nairobi Area)
                 </h3>
                 
-                {/* Location Search */}
                 <div className="space-y-2">
                   <Label>Search Location</Label>
                   <div className="relative">
@@ -992,7 +1041,6 @@ export default function CheckoutPage() {
                       </Button>
                     </div>
                     
-                    {/* Location Suggestions */}
                     <AnimatePresence>
                       {showLocationSearch && locationSuggestions.length > 0 && (
                         <motion.div
@@ -1039,7 +1087,6 @@ export default function CheckoutPage() {
                   </p>
                 </div>
 
-                {/* Address Details */}
                 <div className="space-y-2">
                   <Label htmlFor="address">Street Address *</Label>
                   <Input
@@ -1083,7 +1130,6 @@ export default function CheckoutPage() {
                   </div>
                 </div>
 
-                {/* Save as default address */}
                 {user && (
                   <div className="flex items-center gap-2 mt-2">
                     <input
@@ -1111,7 +1157,13 @@ export default function CheckoutPage() {
                 
                 <RadioGroup
                   value={paymentMethod}
-                  onValueChange={(value: any) => setPaymentMethod(value)}
+                  onValueChange={(value: any) => {
+                    setPaymentMethod(value);
+                    // ✅ Clear payment status when switching to cash
+                    if (value === "cash") {
+                      setPaymentStatus({ status: 'idle', message: '' });
+                    }
+                  }}
                   className="space-y-3"
                 >
                   <div className="flex items-center space-x-3 p-3 border rounded-lg hover:border-pink-500 transition cursor-pointer">
@@ -1257,7 +1309,9 @@ export default function CheckoutPage() {
               >
                 Try Again
               </Button>
-            ) : paymentStatus.status !== 'success' && paymentStatus.status !== 'insufficient_funds' && (
+            ) : paymentStatus.status !== 'success' && 
+              paymentStatus.status !== 'insufficient_funds' && 
+              paymentStatus.status !== 'invalid_credentials' && (
               <Button
                 type="submit"
                 className="w-full bg-pink-600 hover:bg-pink-700 text-white text-lg py-6"
