@@ -29,6 +29,10 @@ import {
   X,
   LocateFixed,
   AlertTriangle,
+  WifiOff,
+  UserX,
+  ShieldAlert,
+  Ban,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase/client";
@@ -56,7 +60,9 @@ interface PaymentStatus {
     | "failed"
     | "cancelled"
     | "insufficient_funds"
-    | "invalid_credentials";
+    | "invalid_credentials"
+    | "timeout"
+    | "user_unreachable";
   message: string;
   checkoutRequestId?: string;
   merchantRequestId?: string;
@@ -115,6 +121,7 @@ export default function CheckoutPage() {
 
   const paymentCheckInterval = useRef<NodeJS.Timeout | null>(null);
   const searchTimeout = useRef<NodeJS.Timeout | null>(null);
+  const paymentTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -175,6 +182,9 @@ export default function CheckoutPage() {
       if (searchTimeout.current) {
         clearTimeout(searchTimeout.current);
       }
+      if (paymentTimeoutRef.current) {
+        clearTimeout(paymentTimeoutRef.current);
+      }
     };
   }, []);
 
@@ -186,6 +196,46 @@ export default function CheckoutPage() {
     }
     setPhoneError("");
     return true;
+  };
+
+  // ✅ Log payment to database
+  const logPayment = async ({
+    orderId,
+    transactionId,
+    amount,
+    phone,
+    status,
+    error,
+    metadata,
+  }: {
+    orderId: string;
+    transactionId?: string;
+    amount: number;
+    phone: string;
+    status: string;
+    error?: string;
+    metadata?: any;
+  }) => {
+    try {
+      const { error: logError } = await supabase.from("payment_logs").insert({
+        order_id: orderId,
+        transaction_id: transactionId || null,
+        amount: amount,
+        phone: phone,
+        status: status,
+        error: error || null,
+        metadata: metadata || null,
+        created_at: new Date().toISOString(),
+      });
+
+      if (logError) {
+        console.error("Failed to log payment:", logError);
+      } else {
+        console.log("✅ Payment logged successfully:", { status, orderId });
+      }
+    } catch (error) {
+      console.error("Error logging payment:", error);
+    }
   };
 
   // ✅ Search location using OpenStreetMap Nominatim with Nairobi restriction
@@ -206,7 +256,7 @@ export default function CheckoutPage() {
             Accept: "application/json",
             "User-Agent": "MysticWines App",
           },
-        },
+        }
       );
 
       const data = await response.json();
@@ -242,7 +292,7 @@ export default function CheckoutPage() {
 
       if (filteredSuggestions.length === 0 && data.length > 0) {
         toast.info(
-          "No locations found in Nairobi area. Please try a more specific search.",
+          "No locations found in Nairobi area. Please try a more specific search."
         );
       }
     } catch (error) {
@@ -272,7 +322,7 @@ export default function CheckoutPage() {
         setShowLocationSearch(false);
       }
     },
-    [searchLocation],
+    [searchLocation]
   );
 
   // ✅ Select a location
@@ -324,7 +374,7 @@ export default function CheckoutPage() {
 
         if (!isWithinNairobi) {
           toast.warning(
-            "You are outside Nairobi. Please enter a Nairobi location manually.",
+            "You are outside Nairobi. Please enter a Nairobi location manually."
           );
           setIsLoadingLocation(false);
           return;
@@ -338,7 +388,7 @@ export default function CheckoutPage() {
                 Accept: "application/json",
                 "User-Agent": "MysticWines App",
               },
-            },
+            }
           );
 
           const data = await response.json();
@@ -372,7 +422,7 @@ export default function CheckoutPage() {
       },
       () => {
         toast.error(
-          "Unable to get current location. Please enable location services or enter address manually.",
+          "Unable to get current location. Please enable location services or enter address manually."
         );
         setIsLoadingLocation(false);
       },
@@ -380,7 +430,7 @@ export default function CheckoutPage() {
         enableHighAccuracy: true,
         timeout: 10000,
         maximumAge: 0,
-      },
+      }
     );
   }, [selectLocation]);
 
@@ -400,7 +450,10 @@ export default function CheckoutPage() {
   }, []);
 
   const createOrder = async () => {
-    const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+    const orderNumber = `ORD-${Date.now()}-${Math.random()
+      .toString(36)
+      .substring(2, 6)
+      .toUpperCase()}`;
 
     const orderData = {
       user_id: user?.id || null,
@@ -474,6 +527,7 @@ export default function CheckoutPage() {
   const checkPaymentStatus = async (
     orderId: string,
     checkoutRequestId: string,
+    phone: string
   ) => {
     try {
       const response = await fetch("/api/mpesa/query", {
@@ -499,45 +553,100 @@ export default function CheckoutPage() {
       // ✅ Handle all error types
       if (data.ResultCode !== "0" && data.ResultDesc) {
         const errorMessage = data.ResultDesc || "Payment failed";
+        const errorCode = data.ResultCode;
 
-        // ✅ Check for specific error types
-        if (errorMessage.toLowerCase().includes("insufficient")) {
+        // ✅ Log failed payment
+        await logPayment({
+          orderId: orderId,
+          transactionId: checkoutRequestId,
+          amount: total,
+          phone: phone,
+          status: "failed",
+          error: errorMessage,
+          metadata: { ...data, errorCode },
+        });
+
+        // ✅ Check for specific error types with comprehensive matching
+        const errorLower = errorMessage.toLowerCase();
+
+        // 1. Insufficient funds
+        if (
+          errorLower.includes("insufficient") ||
+          errorLower.includes("not enough") ||
+          errorLower.includes("low balance")
+        ) {
           setPaymentStatus({
             status: "insufficient_funds",
             message:
               "Insufficient M-Pesa balance. Please top up your M-Pesa and try again.",
-            resultCode: data.ResultCode,
+            resultCode: errorCode,
             resultDesc: errorMessage,
             checkoutRequestId: checkoutRequestId,
           });
-        } else if (
-          errorMessage.toLowerCase().includes("invalid") ||
-          errorMessage.toLowerCase().includes("credentials") ||
-          errorMessage.toLowerCase().includes("initiator") ||
-          errorMessage.toLowerCase().includes("authentication")
+        }
+        // 2. Timeout / User unreachable
+        else if (
+          errorLower.includes("timeout") ||
+          errorLower.includes("cannot be reached") ||
+          errorLower.includes("unreachable") ||
+          errorLower.includes("ds timeout") ||
+          errorCode === "1037"
+        ) {
+          setPaymentStatus({
+            status: "user_unreachable",
+            message:
+              "We couldn't reach your phone. Please ensure your phone is on and has network coverage, then try again.",
+            resultCode: errorCode,
+            resultDesc: errorMessage,
+            checkoutRequestId: checkoutRequestId,
+          });
+        }
+        // 3. Invalid credentials / Configuration errors
+        else if (
+          errorLower.includes("invalid") ||
+          errorLower.includes("credentials") ||
+          errorLower.includes("initiator") ||
+          errorLower.includes("authentication") ||
+          errorLower.includes("configuration") ||
+          errorLower.includes("bad request")
         ) {
           setPaymentStatus({
             status: "invalid_credentials",
             message:
-              "Invalid M-Pesa credentials or configuration error. Please try again or contact support.",
-            resultCode: data.ResultCode,
+              "Payment configuration error. Please try again or contact support.",
+            resultCode: errorCode,
             resultDesc: errorMessage,
             checkoutRequestId: checkoutRequestId,
           });
-        } else if (data.ResultCode === "1032") {
+        }
+        // 4. Cancelled by user
+        else if (errorCode === "1032" || errorLower.includes("cancel")) {
           setPaymentStatus({
             status: "cancelled",
             message:
               "Payment was cancelled. You can try again or choose another method.",
-            resultCode: data.ResultCode,
+            resultCode: errorCode,
             resultDesc: errorMessage,
             checkoutRequestId: checkoutRequestId,
           });
-        } else {
+        }
+        // 5. General timeout
+        else if (errorLower.includes("timeout") || errorCode === "1037") {
+          setPaymentStatus({
+            status: "timeout",
+            message:
+              "Payment request timed out. Please try again or check your M-Pesa app.",
+            resultCode: errorCode,
+            resultDesc: errorMessage,
+            checkoutRequestId: checkoutRequestId,
+          });
+        }
+        // 6. Any other error
+        else {
           setPaymentStatus({
             status: "failed",
             message: errorMessage || "Payment failed. Please try again.",
-            resultCode: data.ResultCode,
+            resultCode: errorCode,
             resultDesc: errorMessage,
             checkoutRequestId: checkoutRequestId,
           });
@@ -557,15 +666,30 @@ export default function CheckoutPage() {
         if (paymentCheckInterval.current) {
           clearInterval(paymentCheckInterval.current);
         }
+        if (paymentTimeoutRef.current) {
+          clearTimeout(paymentTimeoutRef.current);
+        }
         return;
       }
 
       // ✅ Payment successful
       if (data.ResultCode === "0") {
+        const transactionId = data.MpesaReceiptNumber || data.TransactionId;
+
+        // ✅ Log successful payment
+        await logPayment({
+          orderId: orderId,
+          transactionId: transactionId,
+          amount: total,
+          phone: phone,
+          status: "completed",
+          metadata: data,
+        });
+
         setPaymentStatus({
           status: "success",
           message: "Payment confirmed successfully! 🎉",
-          transactionId: data.MpesaReceiptNumber || data.TransactionId,
+          transactionId: transactionId,
         });
 
         await supabase
@@ -573,22 +697,16 @@ export default function CheckoutPage() {
           .update({
             payment_status: "paid",
             status: "processing",
-            payment_receipt: data.MpesaReceiptNumber || data.TransactionId,
+            payment_receipt: transactionId,
             updated_at: new Date().toISOString(),
           })
           .eq("id", orderId);
 
-        await supabase.from("payment_logs").insert({
-          order_id: orderId,
-          payment_method: "mpesa",
-          amount: total,
-          transaction_id: data.MpesaReceiptNumber || data.TransactionId,
-          status: "completed",
-          metadata: data,
-        });
-
         if (paymentCheckInterval.current) {
           clearInterval(paymentCheckInterval.current);
+        }
+        if (paymentTimeoutRef.current) {
+          clearTimeout(paymentTimeoutRef.current);
         }
 
         generateReceipt(orderId);
@@ -615,7 +733,7 @@ export default function CheckoutPage() {
             *,
             product:products(*)
           )
-        `,
+        `
         )
         .eq("id", orderId)
         .single();
@@ -667,6 +785,16 @@ export default function CheckoutPage() {
     const result = await response.json();
 
     if (!result.success) {
+      // ✅ Log failed payment
+      await logPayment({
+        orderId: order.id,
+        amount: total,
+        phone: phoneToUse,
+        status: "failed",
+        error: result.error || "STK Push failed",
+        metadata: result,
+      });
+
       setPaymentStatus({
         status: "failed",
         message: result.error || "M-Pesa payment failed",
@@ -686,24 +814,46 @@ export default function CheckoutPage() {
 
     toast.success("STK push sent! Check your phone.");
 
+    // ✅ Log pending payment
+    await logPayment({
+      orderId: order.id,
+      transactionId: checkoutRequestId,
+      amount: total,
+      phone: phoneToUse,
+      status: "pending",
+      metadata: { merchantRequestId: result.data.MerchantRequestID },
+    });
+
     // Wait 5 seconds before first query
     setTimeout(() => {
-      checkPaymentStatus(order.id, checkoutRequestId);
+      checkPaymentStatus(order.id, checkoutRequestId, phoneToUse);
 
       paymentCheckInterval.current = setInterval(() => {
-        checkPaymentStatus(order.id, checkoutRequestId);
+        checkPaymentStatus(order.id, checkoutRequestId, phoneToUse);
       }, 30000);
     }, 5000);
 
     // Timeout after 5 minutes
-    setTimeout(() => {
+    paymentTimeoutRef.current = setTimeout(() => {
       if (
         paymentStatus.status === "pending" ||
         paymentStatus.status === "processing"
       ) {
+        // ✅ Log timeout
+        logPayment({
+          orderId: order.id,
+          transactionId: checkoutRequestId,
+          amount: total,
+          phone: phoneToUse,
+          status: "timeout",
+          error: "Payment timeout - user did not complete transaction",
+          metadata: { timeout: true },
+        });
+
         setPaymentStatus({
-          status: "failed",
-          message: "Payment timeout. Please try again.",
+          status: "timeout",
+          message:
+            "Payment request timed out. Please try again or check your M-Pesa app.",
         });
         if (paymentCheckInterval.current) {
           clearInterval(paymentCheckInterval.current);
@@ -748,13 +898,15 @@ export default function CheckoutPage() {
         const message = `Hello Mystic Wines,\n\nI want to place an order:\n\n${items
           .map(
             (item) =>
-              `${item.name} x${item.quantity} - KSh ${(item.price * item.quantity).toLocaleString()}`,
+              `${item.name} x${item.quantity} - KSh ${(item.price * item.quantity).toLocaleString()}`
           )
           .join(
-            "\n",
+            "\n"
           )}\n\nTotal: KSh ${total.toLocaleString()}\n\nName: ${formData.name}\nPhone: ${formData.phone}\nAddress: ${formData.address}`;
 
-        const whatsappUrl = `https://wa.me/254710835445?text=${encodeURIComponent(message)}`;
+        const whatsappUrl = `https://wa.me/254710835445?text=${encodeURIComponent(
+          message
+        )}`;
 
         toast.success("Order placed! Redirecting to WhatsApp...");
         dispatch(clearCart());
@@ -785,7 +937,7 @@ export default function CheckoutPage() {
 
     if (paymentStatus.status === "idle") return null;
 
-    // ✅ Status config with all possible statuses - using 'as const' for better type inference
+    // ✅ Status config with all possible statuses
     const statusConfig = {
       pending: {
         icon: Clock,
@@ -812,7 +964,7 @@ export default function CheckoutPage() {
         border: "border-red-200 dark:border-red-800",
       },
       cancelled: {
-        icon: XCircle,
+        icon: Ban,
         color: "text-orange-600",
         bg: "bg-orange-50 dark:bg-orange-900/20",
         border: "border-orange-200 dark:border-orange-800",
@@ -824,7 +976,19 @@ export default function CheckoutPage() {
         border: "border-amber-200 dark:border-amber-800",
       },
       invalid_credentials: {
-        icon: AlertTriangle,
+        icon: ShieldAlert,
+        color: "text-red-600",
+        bg: "bg-red-50 dark:bg-red-900/20",
+        border: "border-red-200 dark:border-red-800",
+      },
+      timeout: {
+        icon: Clock,
+        color: "text-red-600",
+        bg: "bg-red-50 dark:bg-red-900/20",
+        border: "border-red-200 dark:border-red-800",
+      },
+      user_unreachable: {
+        icon: WifiOff,
         color: "text-red-600",
         bg: "bg-red-50 dark:bg-red-900/20",
         border: "border-red-200 dark:border-red-800",
@@ -836,7 +1000,7 @@ export default function CheckoutPage() {
     const status = paymentStatus.status as PaymentStatusKey;
     const config = statusConfig[status];
 
-    // ✅ If config is undefined (should never happen), use a default fallback
+    // ✅ If config is undefined, use a default fallback
     if (!config) {
       return (
         <motion.div
@@ -855,6 +1019,67 @@ export default function CheckoutPage() {
     }
 
     const Icon = config.icon;
+
+    // ✅ Custom rendering for user_unreachable
+    if (paymentStatus.status === "user_unreachable") {
+      return (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className={`p-5 rounded-xl ${config.bg} border ${config.border}`}
+        >
+          <div className="flex items-start gap-4">
+            <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-full">
+              <UserX className={`h-6 w-6 ${config.color}`} />
+            </div>
+            <div className="flex-1">
+              <h4 className="font-bold text-red-700 dark:text-red-400">
+                Phone Unreachable
+              </h4>
+              <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
+                {paymentStatus.message}
+              </p>
+              {paymentStatus.resultDesc && (
+                <p className="text-xs text-red-500 mt-1">
+                  Error: {paymentStatus.resultDesc}
+                </p>
+              )}
+              <div className="mt-4 space-y-2">
+                <p className="text-xs text-gray-500">
+                  <span className="font-medium">Troubleshooting tips:</span>
+                </p>
+                <ul className="text-xs text-gray-500 list-disc pl-4 space-y-1">
+                  <li>Ensure your phone is switched on and has network coverage</li>
+                  <li>Check if you have enough airtime for the transaction</li>
+                  <li>Verify your phone number is correct</li>
+                  <li>Try again in a few minutes</li>
+                </ul>
+              </div>
+              <div className="mt-4 flex gap-2">
+                <Button
+                  type="button"
+                  onClick={() =>
+                    setPaymentStatus({ status: "idle", message: "" })
+                  }
+                  className="bg-red-600 hover:bg-red-700 text-white"
+                  size="sm"
+                >
+                  Try Again
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setPaymentMethod("cash")}
+                  size="sm"
+                >
+                  Use Cash on Delivery
+                </Button>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      );
+    }
 
     // ✅ Custom rendering for insufficient funds
     if (paymentStatus.status === "insufficient_funds") {
@@ -875,6 +1100,11 @@ export default function CheckoutPage() {
               <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
                 {paymentStatus.message}
               </p>
+              {paymentStatus.resultDesc && (
+                <p className="text-xs text-red-500 mt-1">
+                  Error: {paymentStatus.resultDesc}
+                </p>
+              )}
               <p className="text-xs text-gray-500 mt-2">
                 Please top up your M-Pesa and try again, or choose a different
                 payment method.
@@ -905,6 +1135,59 @@ export default function CheckoutPage() {
       );
     }
 
+    // ✅ Custom rendering for timeout
+    if (paymentStatus.status === "timeout") {
+      return (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className={`p-5 rounded-xl ${config.bg} border ${config.border}`}
+        >
+          <div className="flex items-start gap-4">
+            <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-full">
+              <Clock className={`h-6 w-6 ${config.color}`} />
+            </div>
+            <div className="flex-1">
+              <h4 className="font-bold text-red-700 dark:text-red-400">
+                Payment Request Timed Out
+              </h4>
+              <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
+                {paymentStatus.message}
+              </p>
+              {paymentStatus.resultDesc && (
+                <p className="text-xs text-red-500 mt-1">
+                  Error: {paymentStatus.resultDesc}
+                </p>
+              )}
+              <p className="text-xs text-gray-500 mt-2">
+                Please try again or check your M-Pesa app for pending requests.
+              </p>
+              <div className="mt-3 flex gap-2">
+                <Button
+                  type="button"
+                  onClick={() =>
+                    setPaymentStatus({ status: "idle", message: "" })
+                  }
+                  className="bg-red-600 hover:bg-red-700 text-white"
+                  size="sm"
+                >
+                  Try Again
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setPaymentMethod("cash")}
+                  size="sm"
+                >
+                  Use Cash on Delivery
+                </Button>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      );
+    }
+
     // ✅ Custom rendering for invalid credentials
     if (paymentStatus.status === "invalid_credentials") {
       return (
@@ -915,7 +1198,7 @@ export default function CheckoutPage() {
         >
           <div className="flex items-start gap-4">
             <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-full">
-              <AlertTriangle className={`h-6 w-6 ${config.color}`} />
+              <ShieldAlert className={`h-6 w-6 ${config.color}`} />
             </div>
             <div className="flex-1">
               <h4 className="font-bold text-red-700 dark:text-red-400">
@@ -925,10 +1208,10 @@ export default function CheckoutPage() {
                 {paymentStatus.message}
               </p>
               {paymentStatus.resultDesc && (
-                  <p className="text-xs text-red-500 mt-1">
-                    Error: {paymentStatus.resultDesc}
-                  </p>
-                )}
+                <p className="text-xs text-red-500 mt-1">
+                  Error: {paymentStatus.resultDesc}
+                </p>
+              )}
               <p className="text-xs text-gray-500 mt-1">
                 Please try again or contact support if the issue persists.
               </p>
@@ -976,7 +1259,6 @@ export default function CheckoutPage() {
                 Reference: {paymentStatus.checkoutRequestId.slice(0, 16)}...
               </p>
             )}
-            {/* ✅ Only show error details for generic errors */}
             {paymentStatus.resultDesc &&
               paymentStatus.status !== "cancelled" && (
                 <p className="text-xs text-red-500 mt-1">
@@ -1006,6 +1288,7 @@ export default function CheckoutPage() {
       </motion.div>
     );
   };
+
   // ✅ Show empty cart state only when truly empty and not in payment flow
   if (!hasCartItems && paymentStatus.status === "idle" && !isLoading) {
     return (
@@ -1292,7 +1575,6 @@ export default function CheckoutPage() {
                   value={paymentMethod}
                   onValueChange={(value: any) => {
                     setPaymentMethod(value);
-                    // ✅ Clear payment status when switching to cash
                     if (value === "cash") {
                       setPaymentStatus({ status: "idle", message: "" });
                     }
@@ -1440,7 +1722,9 @@ export default function CheckoutPage() {
             )}
 
             {paymentStatus.status === "failed" ||
-            paymentStatus.status === "cancelled" ? (
+            paymentStatus.status === "cancelled" ||
+            paymentStatus.status === "timeout" ||
+            paymentStatus.status === "user_unreachable" ? (
               <Button
                 type="button"
                 onClick={() =>
