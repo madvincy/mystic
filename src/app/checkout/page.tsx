@@ -27,7 +27,6 @@ import {
   Info,
   Search,
   X,
-  Navigation,
   LocateFixed,
   AlertTriangle,
 } from "lucide-react";
@@ -44,11 +43,20 @@ const NAIROBI_BOUNDS = {
   north: -1.15,
   south: -1.45,
   west: 36.65,
-  east: 37.10,
+  east: 37.1,
 };
 
+// ✅ PaymentStatus interface with all possible statuses
 interface PaymentStatus {
-  status: 'idle' | 'pending' | 'processing' | 'success' | 'failed' | 'cancelled' | 'insufficient_funds' | 'invalid_credentials';
+  status:
+    | "idle"
+    | "pending"
+    | "processing"
+    | "success"
+    | "failed"
+    | "cancelled"
+    | "insufficient_funds"
+    | "invalid_credentials";
   message: string;
   checkoutRequestId?: string;
   merchantRequestId?: string;
@@ -78,27 +86,33 @@ export default function CheckoutPage() {
   const { user } = useAuth();
   const dispatch = useDispatch();
   const { items, total } = useSelector((state: RootState) => state.cart);
-  
+
   const [isLoading, setIsLoading] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<"mpesa" | "cash">("mpesa");
   const [orderId, setOrderId] = useState<string | null>(null);
-  const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>({ status: 'idle', message: '' });
+  const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>({
+    status: "idle",
+    message: "",
+  });
   const [showReceipt, setShowReceipt] = useState(false);
   const [receiptData, setReceiptData] = useState<any>(null);
   const [useDifferentPhone, setUseDifferentPhone] = useState(false);
   const [differentPhone, setDifferentPhone] = useState("");
   const [phoneError, setPhoneError] = useState("");
-  
+
   // Location states - using OpenStreetMap Nominatim
   const [searchQuery, setSearchQuery] = useState("");
-  const [locationSuggestions, setLocationSuggestions] = useState<LocationSuggestion[]>([]);
+  const [locationSuggestions, setLocationSuggestions] = useState<
+    LocationSuggestion[]
+  >([]);
   const [showLocationSearch, setShowLocationSearch] = useState(false);
-  const [selectedLocation, setSelectedLocation] = useState<LocationSuggestion | null>(null);
+  const [selectedLocation, setSelectedLocation] =
+    useState<LocationSuggestion | null>(null);
   const [isSearchingLocation, setIsSearchingLocation] = useState(false);
   const [saveAsDefaultAddress, setSaveAsDefaultAddress] = useState(false);
   const [addressUpdated, setAddressUpdated] = useState(false);
   const [isLoadingLocation, setIsLoadingLocation] = useState(false);
-  
+
   const paymentCheckInterval = useRef<NodeJS.Timeout | null>(null);
   const searchTimeout = useRef<NodeJS.Timeout | null>(null);
 
@@ -113,7 +127,7 @@ export default function CheckoutPage() {
     longitude: "",
   });
 
-  // ✅ Check if cart has items - with proper best practices
+  // ✅ Check if cart has items
   const hasCartItems = items.length > 0;
 
   // ✅ Load user data when available
@@ -124,7 +138,7 @@ export default function CheckoutPage() {
       const userEmail = user.email || "";
       const userAddress = user.user_metadata?.address || "";
       const userCity = user.user_metadata?.city || "Nairobi";
-      
+
       setFormData((prev) => ({
         ...prev,
         name: userName || prev.name,
@@ -135,7 +149,7 @@ export default function CheckoutPage() {
         latitude: user.user_metadata?.latitude || "",
         longitude: user.user_metadata?.longitude || "",
       }));
-      
+
       if (userPhone) {
         setDifferentPhone(userPhone);
       }
@@ -144,10 +158,8 @@ export default function CheckoutPage() {
 
   // ✅ Handle cart redirection with proper checks
   useEffect(() => {
-    const shouldRedirect = 
-      !hasCartItems && 
-      !isLoading && 
-      paymentStatus.status === 'idle';
+    const shouldRedirect =
+      !hasCartItems && !isLoading && paymentStatus.status === "idle";
 
     if (shouldRedirect) {
       router.push("/cart");
@@ -186,19 +198,19 @@ export default function CheckoutPage() {
     setIsSearchingLocation(true);
     try {
       const searchQueryWithNairobi = `${query}, Nairobi, Kenya`;
-      
+
       const response = await fetch(
         `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchQueryWithNairobi)}&format=json&addressdetails=1&limit=10&countrycodes=KE`,
         {
           headers: {
-            'Accept': 'application/json',
-            'User-Agent': 'MysticWines App',
+            Accept: "application/json",
+            "User-Agent": "MysticWines App",
           },
-        }
+        },
       );
-      
+
       const data = await response.json();
-      
+
       const filteredSuggestions = data
         .filter((item: any) => {
           const lat = parseFloat(item.lat);
@@ -216,47 +228,52 @@ export default function CheckoutPage() {
           lat: item.lat,
           lon: item.lon,
           address: {
-            road: item.address?.road || '',
-            suburb: item.address?.suburb || '',
-            city: item.address?.city || item.address?.town || '',
-            town: item.address?.town || '',
-            state: item.address?.state || '',
-            country: item.address?.country || 'Kenya',
-            postcode: item.address?.postcode || '',
+            road: item.address?.road || "",
+            suburb: item.address?.suburb || "",
+            city: item.address?.city || item.address?.town || "",
+            town: item.address?.town || "",
+            state: item.address?.state || "",
+            country: item.address?.country || "Kenya",
+            postcode: item.address?.postcode || "",
           },
         }));
-      
+
       setLocationSuggestions(filteredSuggestions);
-      
+
       if (filteredSuggestions.length === 0 && data.length > 0) {
-        toast.info('No locations found in Nairobi area. Please try a more specific search.');
+        toast.info(
+          "No locations found in Nairobi area. Please try a more specific search.",
+        );
       }
     } catch (error) {
-      console.error('Error searching location:', error);
-      toast.error('Failed to search location');
+      console.error("Error searching location:", error);
+      toast.error("Failed to search location");
     } finally {
       setIsSearchingLocation(false);
     }
   }, []);
 
   // ✅ Handle location search input with debounce
-  const handleLocationSearch = useCallback((value: string) => {
-    setSearchQuery(value);
-    
-    if (searchTimeout.current) {
-      clearTimeout(searchTimeout.current);
-    }
-    
-    if (value.length >= 3) {
-      searchTimeout.current = setTimeout(() => {
-        searchLocation(value);
-        setShowLocationSearch(true);
-      }, 500);
-    } else {
-      setLocationSuggestions([]);
-      setShowLocationSearch(false);
-    }
-  }, [searchLocation]);
+  const handleLocationSearch = useCallback(
+    (value: string) => {
+      setSearchQuery(value);
+
+      if (searchTimeout.current) {
+        clearTimeout(searchTimeout.current);
+      }
+
+      if (value.length >= 3) {
+        searchTimeout.current = setTimeout(() => {
+          searchLocation(value);
+          setShowLocationSearch(true);
+        }, 500);
+      } else {
+        setLocationSuggestions([]);
+        setShowLocationSearch(false);
+      }
+    },
+    [searchLocation],
+  );
 
   // ✅ Select a location
   const selectLocation = useCallback((location: LocationSuggestion) => {
@@ -264,33 +281,33 @@ export default function CheckoutPage() {
     setShowLocationSearch(false);
     setSearchQuery(location.display_name);
     setLocationSuggestions([]);
-    
+
     const addressParts = [
       location.address?.road,
       location.address?.suburb,
       location.address?.city || location.address?.town,
     ].filter(Boolean);
-    
-    const city = location.address?.city || location.address?.town || 'Nairobi';
-    const country = location.address?.country || 'Kenya';
-    
-    setFormData(prev => ({
+
+    const city = location.address?.city || location.address?.town || "Nairobi";
+    const country = location.address?.country || "Kenya";
+
+    setFormData((prev) => ({
       ...prev,
-      address: addressParts.join(', ') || location.display_name,
+      address: addressParts.join(", ") || location.display_name,
       city: city,
       country: country,
       latitude: location.lat,
       longitude: location.lon,
     }));
-    
+
     setAddressUpdated(true);
-    toast.success('Location selected successfully!');
+    toast.success("Location selected successfully!");
   }, []);
 
   // ✅ Detect current location
   const detectCurrentLocation = useCallback(() => {
     if (!navigator.geolocation) {
-      toast.error('Geolocation is not supported by your browser');
+      toast.error("Geolocation is not supported by your browser");
       return;
     }
 
@@ -298,15 +315,17 @@ export default function CheckoutPage() {
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         const { latitude, longitude } = position.coords;
-        
-        const isWithinNairobi = 
-          latitude >= NAIROBI_BOUNDS.south && 
+
+        const isWithinNairobi =
+          latitude >= NAIROBI_BOUNDS.south &&
           latitude <= NAIROBI_BOUNDS.north &&
-          longitude >= NAIROBI_BOUNDS.west && 
+          longitude >= NAIROBI_BOUNDS.west &&
           longitude <= NAIROBI_BOUNDS.east;
 
         if (!isWithinNairobi) {
-          toast.warning('You are outside Nairobi. Please enter a Nairobi location manually.');
+          toast.warning(
+            "You are outside Nairobi. Please enter a Nairobi location manually.",
+          );
           setIsLoadingLocation(false);
           return;
         }
@@ -316,14 +335,14 @@ export default function CheckoutPage() {
             `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&addressdetails=1`,
             {
               headers: {
-                'Accept': 'application/json',
-                'User-Agent': 'MysticWines App',
+                Accept: "application/json",
+                "User-Agent": "MysticWines App",
               },
-            }
+            },
           );
-          
+
           const data = await response.json();
-          
+
           if (data) {
             const location: LocationSuggestion = {
               place_id: data.place_id,
@@ -331,50 +350,52 @@ export default function CheckoutPage() {
               lat: data.lat,
               lon: data.lon,
               address: {
-                road: data.address?.road || '',
-                suburb: data.address?.suburb || '',
-                city: data.address?.city || data.address?.town || '',
-                town: data.address?.town || '',
-                state: data.address?.state || '',
-                country: data.address?.country || 'Kenya',
-                postcode: data.address?.postcode || '',
+                road: data.address?.road || "",
+                suburb: data.address?.suburb || "",
+                city: data.address?.city || data.address?.town || "",
+                town: data.address?.town || "",
+                state: data.address?.state || "",
+                country: data.address?.country || "Kenya",
+                postcode: data.address?.postcode || "",
               },
             };
-            
+
             selectLocation(location);
-            toast.success('Current location detected!');
+            toast.success("Current location detected!");
           }
         } catch (error) {
-          console.error('Error getting location:', error);
-          toast.error('Failed to get current location');
+          console.error("Error getting location:", error);
+          toast.error("Failed to get current location");
         } finally {
           setIsLoadingLocation(false);
         }
       },
       () => {
-        toast.error('Unable to get current location. Please enable location services or enter address manually.');
+        toast.error(
+          "Unable to get current location. Please enable location services or enter address manually.",
+        );
         setIsLoadingLocation(false);
       },
       {
         enableHighAccuracy: true,
         timeout: 10000,
         maximumAge: 0,
-      }
+      },
     );
   }, [selectLocation]);
 
   // ✅ Clear selected location
   const clearSelectedLocation = useCallback(() => {
     setSelectedLocation(null);
-    setSearchQuery('');
+    setSearchQuery("");
     setAddressUpdated(false);
     setLocationSuggestions([]);
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      address: '',
-      city: 'Nairobi',
-      latitude: '',
-      longitude: '',
+      address: "",
+      city: "Nairobi",
+      latitude: "",
+      longitude: "",
     }));
   }, []);
 
@@ -440,17 +461,20 @@ export default function CheckoutPage() {
             city: formData.city,
             latitude: formData.latitude,
             longitude: formData.longitude,
-          }
+          },
         })
         .eq("id", user.id);
-      
+
       toast.success("Address saved to your profile!");
     }
 
     return order;
   };
 
-  const checkPaymentStatus = async (orderId: string, checkoutRequestId: string) => {
+  const checkPaymentStatus = async (
+    orderId: string,
+    checkoutRequestId: string,
+  ) => {
     try {
       const response = await fetch("/api/mpesa/query", {
         method: "POST",
@@ -466,60 +490,63 @@ export default function CheckoutPage() {
       const result = await response.json();
 
       if (!result.success) {
-        console.error('Query failed:', result.error);
+        console.error("Query failed:", result.error);
         return;
       }
 
       const data = result.data;
-      
+
       // ✅ Handle all error types
       if (data.ResultCode !== "0" && data.ResultDesc) {
-        const errorMessage = data.ResultDesc || 'Payment failed';
-        
+        const errorMessage = data.ResultDesc || "Payment failed";
+
         // ✅ Check for specific error types
-        if (errorMessage.toLowerCase().includes('insufficient')) {
+        if (errorMessage.toLowerCase().includes("insufficient")) {
           setPaymentStatus({
-            status: 'insufficient_funds',
-            message: 'Insufficient M-Pesa balance. Please top up your M-Pesa and try again.',
+            status: "insufficient_funds",
+            message:
+              "Insufficient M-Pesa balance. Please top up your M-Pesa and try again.",
             resultCode: data.ResultCode,
             resultDesc: errorMessage,
             checkoutRequestId: checkoutRequestId,
           });
         } else if (
-          errorMessage.toLowerCase().includes('invalid') ||
-          errorMessage.toLowerCase().includes('credentials') ||
-          errorMessage.toLowerCase().includes('initiator') ||
-          errorMessage.toLowerCase().includes('authentication')
+          errorMessage.toLowerCase().includes("invalid") ||
+          errorMessage.toLowerCase().includes("credentials") ||
+          errorMessage.toLowerCase().includes("initiator") ||
+          errorMessage.toLowerCase().includes("authentication")
         ) {
           setPaymentStatus({
-            status: 'invalid_credentials',
-            message: 'Invalid M-Pesa credentials or configuration error. Please try again or contact support.',
+            status: "invalid_credentials",
+            message:
+              "Invalid M-Pesa credentials or configuration error. Please try again or contact support.",
             resultCode: data.ResultCode,
             resultDesc: errorMessage,
             checkoutRequestId: checkoutRequestId,
           });
         } else if (data.ResultCode === "1032") {
           setPaymentStatus({
-            status: 'cancelled',
-            message: 'Payment was cancelled. You can try again or choose another method.',
+            status: "cancelled",
+            message:
+              "Payment was cancelled. You can try again or choose another method.",
             resultCode: data.ResultCode,
             resultDesc: errorMessage,
             checkoutRequestId: checkoutRequestId,
           });
         } else {
           setPaymentStatus({
-            status: 'failed',
-            message: errorMessage || 'Payment failed. Please try again.',
+            status: "failed",
+            message: errorMessage || "Payment failed. Please try again.",
             resultCode: data.ResultCode,
             resultDesc: errorMessage,
             checkoutRequestId: checkoutRequestId,
           });
         }
-        
+
         // ✅ Update order status
         await supabase
           .from("orders")
-          .update({ 
+          .update({
             payment_status: "failed",
             status: "failed",
             payment_error: errorMessage,
@@ -532,18 +559,18 @@ export default function CheckoutPage() {
         }
         return;
       }
-      
+
       // ✅ Payment successful
       if (data.ResultCode === "0") {
         setPaymentStatus({
-          status: 'success',
-          message: 'Payment confirmed successfully! 🎉',
+          status: "success",
+          message: "Payment confirmed successfully! 🎉",
           transactionId: data.MpesaReceiptNumber || data.TransactionId,
         });
-        
+
         await supabase
           .from("orders")
-          .update({ 
+          .update({
             payment_status: "paid",
             status: "processing",
             payment_receipt: data.MpesaReceiptNumber || data.TransactionId,
@@ -551,27 +578,25 @@ export default function CheckoutPage() {
           })
           .eq("id", orderId);
 
-        await supabase
-          .from("payment_logs")
-          .insert({
-            order_id: orderId,
-            payment_method: "mpesa",
-            amount: total,
-            transaction_id: data.MpesaReceiptNumber || data.TransactionId,
-            status: "completed",
-            metadata: data,
-          });
+        await supabase.from("payment_logs").insert({
+          order_id: orderId,
+          payment_method: "mpesa",
+          amount: total,
+          transaction_id: data.MpesaReceiptNumber || data.TransactionId,
+          status: "completed",
+          metadata: data,
+        });
 
         if (paymentCheckInterval.current) {
           clearInterval(paymentCheckInterval.current);
         }
-        
+
         generateReceipt(orderId);
       } else {
         // ✅ Any other status - keep checking
         setPaymentStatus({
-          status: 'processing',
-          message: 'Waiting for payment confirmation...',
+          status: "processing",
+          message: "Waiting for payment confirmation...",
         });
       }
     } catch (error) {
@@ -583,13 +608,15 @@ export default function CheckoutPage() {
     try {
       const { data: order, error } = await supabase
         .from("orders")
-        .select(`
+        .select(
+          `
           *,
           order_items:order_items(
             *,
             product:products(*)
           )
-        `)
+        `,
+        )
         .eq("id", orderId)
         .single();
 
@@ -614,7 +641,7 @@ export default function CheckoutPage() {
 
   const handleMpesaPayment = async (order: any) => {
     const phoneToUse = useDifferentPhone ? differentPhone : formData.phone;
-    
+
     if (!validatePhone(phoneToUse)) {
       return;
     }
@@ -641,7 +668,7 @@ export default function CheckoutPage() {
 
     if (!result.success) {
       setPaymentStatus({
-        status: 'failed',
+        status: "failed",
         message: result.error || "M-Pesa payment failed",
       });
       toast.error(result.error || "Payment failed");
@@ -649,10 +676,10 @@ export default function CheckoutPage() {
     }
 
     const checkoutRequestId = result.data.CheckoutRequestID;
-    
+
     setPaymentStatus({
-      status: 'pending',
-      message: 'STK push sent! Please check your phone and enter PIN.',
+      status: "pending",
+      message: "STK push sent! Please check your phone and enter PIN.",
       checkoutRequestId,
       merchantRequestId: result.data.MerchantRequestID,
     });
@@ -662,7 +689,7 @@ export default function CheckoutPage() {
     // Wait 5 seconds before first query
     setTimeout(() => {
       checkPaymentStatus(order.id, checkoutRequestId);
-      
+
       paymentCheckInterval.current = setInterval(() => {
         checkPaymentStatus(order.id, checkoutRequestId);
       }, 30000);
@@ -670,10 +697,13 @@ export default function CheckoutPage() {
 
     // Timeout after 5 minutes
     setTimeout(() => {
-      if (paymentStatus.status === 'pending' || paymentStatus.status === 'processing') {
+      if (
+        paymentStatus.status === "pending" ||
+        paymentStatus.status === "processing"
+      ) {
         setPaymentStatus({
-          status: 'failed',
-          message: 'Payment timeout. Please try again.',
+          status: "failed",
+          message: "Payment timeout. Please try again.",
         });
         if (paymentCheckInterval.current) {
           clearInterval(paymentCheckInterval.current);
@@ -685,7 +715,12 @@ export default function CheckoutPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.name || !formData.email || !formData.phone || !formData.address) {
+    if (
+      !formData.name ||
+      !formData.email ||
+      !formData.phone ||
+      !formData.address
+    ) {
       toast.error("Please fill in all required fields");
       return;
     }
@@ -698,7 +733,7 @@ export default function CheckoutPage() {
     }
 
     setIsLoading(true);
-    setPaymentStatus({ status: 'processing', message: 'Creating order...' });
+    setPaymentStatus({ status: "processing", message: "Creating order..." });
 
     try {
       const order = await createOrder();
@@ -708,20 +743,22 @@ export default function CheckoutPage() {
         await handleMpesaPayment(order);
       } else {
         // ✅ Cash on Delivery - Clear payment status
-        setPaymentStatus({ status: 'idle', message: '' });
-        
+        setPaymentStatus({ status: "idle", message: "" });
+
         const message = `Hello Mystic Wines,\n\nI want to place an order:\n\n${items
           .map(
             (item) =>
               `${item.name} x${item.quantity} - KSh ${(item.price * item.quantity).toLocaleString()}`,
           )
-          .join("\n")}\n\nTotal: KSh ${total.toLocaleString()}\n\nName: ${formData.name}\nPhone: ${formData.phone}\nAddress: ${formData.address}`;
+          .join(
+            "\n",
+          )}\n\nTotal: KSh ${total.toLocaleString()}\n\nName: ${formData.name}\nPhone: ${formData.phone}\nAddress: ${formData.address}`;
 
         const whatsappUrl = `https://wa.me/254710835445?text=${encodeURIComponent(message)}`;
-        
-        toast.success('Order placed! Redirecting to WhatsApp...');
+
+        toast.success("Order placed! Redirecting to WhatsApp...");
         dispatch(clearCart());
-        
+
         setTimeout(() => {
           window.open(whatsappUrl, "_blank");
           router.push("/orders");
@@ -730,7 +767,7 @@ export default function CheckoutPage() {
     } catch (error: any) {
       console.error("Checkout error:", error);
       setPaymentStatus({
-        status: 'failed',
+        status: "failed",
         message: error.message || "Failed to place order",
       });
       toast.error(error.message || "Failed to place order");
@@ -739,52 +776,115 @@ export default function CheckoutPage() {
     }
   };
 
-  // Render payment status - ✅ Only show for M-Pesa payments
+  // Render payment status
   const renderPaymentStatus = () => {
     // ✅ Don't show payment status for cash payments
     if (paymentMethod === "cash") {
       return null;
     }
 
-    if (paymentStatus.status === 'idle') return null;
+    if (paymentStatus.status === "idle") return null;
 
+    // ✅ Status config with all possible statuses - using 'as const' for better type inference
     const statusConfig = {
-      pending: { icon: Clock, color: 'text-yellow-600', bg: 'bg-yellow-50 dark:bg-yellow-900/20', border: 'border-yellow-200 dark:border-yellow-800' },
-      processing: { icon: Loader2, color: 'text-blue-600', bg: 'bg-blue-50 dark:bg-blue-900/20', border: 'border-blue-200 dark:border-blue-800' },
-      success: { icon: CheckCircle, color: 'text-green-600', bg: 'bg-green-50 dark:bg-green-900/20', border: 'border-green-200 dark:border-green-800' },
-      failed: { icon: XCircle, color: 'text-red-600', bg: 'bg-red-50 dark:bg-red-900/20', border: 'border-red-200 dark:border-red-800' },
-      cancelled: { icon: XCircle, color: 'text-orange-600', bg: 'bg-orange-50 dark:bg-orange-900/20', border: 'border-orange-200 dark:border-orange-800' },
-      insufficient_funds: { icon: AlertTriangle, color: 'text-amber-600', bg: 'bg-amber-50 dark:bg-amber-900/20', border: 'border-amber-200 dark:border-amber-800' },
-      invalid_credentials: { icon: AlertTriangle, color: 'text-red-600', bg: 'bg-red-50 dark:bg-red-900/20', border: 'border-red-200 dark:border-red-800' },
-    };
+      pending: {
+        icon: Clock,
+        color: "text-yellow-600",
+        bg: "bg-yellow-50 dark:bg-yellow-900/20",
+        border: "border-yellow-200 dark:border-yellow-800",
+      },
+      processing: {
+        icon: Loader2,
+        color: "text-blue-600",
+        bg: "bg-blue-50 dark:bg-blue-900/20",
+        border: "border-blue-200 dark:border-blue-800",
+      },
+      success: {
+        icon: CheckCircle,
+        color: "text-green-600",
+        bg: "bg-green-50 dark:bg-green-900/20",
+        border: "border-green-200 dark:border-green-800",
+      },
+      failed: {
+        icon: XCircle,
+        color: "text-red-600",
+        bg: "bg-red-50 dark:bg-red-900/20",
+        border: "border-red-200 dark:border-red-800",
+      },
+      cancelled: {
+        icon: XCircle,
+        color: "text-orange-600",
+        bg: "bg-orange-50 dark:bg-orange-900/20",
+        border: "border-orange-200 dark:border-orange-800",
+      },
+      insufficient_funds: {
+        icon: AlertTriangle,
+        color: "text-amber-600",
+        bg: "bg-amber-50 dark:bg-amber-900/20",
+        border: "border-amber-200 dark:border-amber-800",
+      },
+      invalid_credentials: {
+        icon: AlertTriangle,
+        color: "text-red-600",
+        bg: "bg-red-50 dark:bg-red-900/20",
+        border: "border-red-200 dark:border-red-800",
+      },
+    } as const;
 
-    const config = statusConfig[paymentStatus.status as keyof typeof statusConfig];
-    const Icon = config?.icon || AlertTriangle;
+    // ✅ Safe access with type guard
+    type PaymentStatusKey = keyof typeof statusConfig;
+    const status = paymentStatus.status as PaymentStatusKey;
+    const config = statusConfig[status];
 
-    // ✅ Custom rendering for insufficient funds
-    if (paymentStatus.status === 'insufficient_funds') {
+    // ✅ If config is undefined (should never happen), use a default fallback
+    if (!config) {
       return (
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className={`p-5 rounded-xl ${config?.bg} border ${config?.border}`}
+          className="p-4 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700"
+        >
+          <div className="flex items-start gap-3">
+            <Info className="h-5 w-5 text-gray-500" />
+            <div>
+              <p className="font-medium text-sm">{paymentStatus.message}</p>
+            </div>
+          </div>
+        </motion.div>
+      );
+    }
+
+    const Icon = config.icon;
+
+    // ✅ Custom rendering for insufficient funds
+    if (paymentStatus.status === "insufficient_funds") {
+      return (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className={`p-5 rounded-xl ${config.bg} border ${config.border}`}
         >
           <div className="flex items-start gap-4">
             <div className="p-2 bg-amber-100 dark:bg-amber-900/30 rounded-full">
-              <AlertTriangle className={`h-6 w-6 ${config?.color}`} />
+              <AlertTriangle className={`h-6 w-6 ${config.color}`} />
             </div>
             <div className="flex-1">
-              <h4 className="font-bold text-amber-700 dark:text-amber-400">Insufficient M-Pesa Balance</h4>
+              <h4 className="font-bold text-amber-700 dark:text-amber-400">
+                Insufficient M-Pesa Balance
+              </h4>
               <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
                 {paymentStatus.message}
               </p>
               <p className="text-xs text-gray-500 mt-2">
-                Please top up your M-Pesa and try again, or choose a different payment method.
+                Please top up your M-Pesa and try again, or choose a different
+                payment method.
               </p>
               <div className="mt-3 flex gap-2">
                 <Button
                   type="button"
-                  onClick={() => setPaymentStatus({ status: 'idle', message: '' })}
+                  onClick={() =>
+                    setPaymentStatus({ status: "idle", message: "" })
+                  }
                   className="bg-amber-600 hover:bg-amber-700 text-white"
                   size="sm"
                 >
@@ -806,34 +906,38 @@ export default function CheckoutPage() {
     }
 
     // ✅ Custom rendering for invalid credentials
-    if (paymentStatus.status === 'invalid_credentials') {
+    if (paymentStatus.status === "invalid_credentials") {
       return (
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className={`p-5 rounded-xl ${config?.bg} border ${config?.border}`}
+          className={`p-5 rounded-xl ${config.bg} border ${config.border}`}
         >
           <div className="flex items-start gap-4">
             <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-full">
-              <AlertTriangle className={`h-6 w-6 ${config?.color}`} />
+              <AlertTriangle className={`h-6 w-6 ${config.color}`} />
             </div>
             <div className="flex-1">
-              <h4 className="font-bold text-red-700 dark:text-red-400">Payment Configuration Error</h4>
+              <h4 className="font-bold text-red-700 dark:text-red-400">
+                Payment Configuration Error
+              </h4>
               <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
                 {paymentStatus.message}
               </p>
               {paymentStatus.resultDesc && (
-                <p className="text-xs text-gray-500 mt-2">
-                  Error details: {paymentStatus.resultDesc}
-                </p>
-              )}
+                  <p className="text-xs text-red-500 mt-1">
+                    Error: {paymentStatus.resultDesc}
+                  </p>
+                )}
               <p className="text-xs text-gray-500 mt-1">
                 Please try again or contact support if the issue persists.
               </p>
               <div className="mt-3 flex gap-2">
                 <Button
                   type="button"
-                  onClick={() => setPaymentStatus({ status: 'idle', message: '' })}
+                  onClick={() =>
+                    setPaymentStatus({ status: "idle", message: "" })
+                  }
                   className="bg-red-600 hover:bg-red-700 text-white"
                   size="sm"
                 >
@@ -854,14 +958,17 @@ export default function CheckoutPage() {
       );
     }
 
+    // ✅ Default status rendering
     return (
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
-        className={`p-4 rounded-lg ${config?.bg} border ${config?.border}`}
+        className={`p-4 rounded-lg ${config.bg} border ${config.border}`}
       >
         <div className="flex items-start gap-3">
-          <Icon className={`h-5 w-5 mt-0.5 ${config?.color} ${paymentStatus.status === 'processing' || paymentStatus.status === 'pending' ? 'animate-spin' : ''}`} />
+          <Icon
+            className={`h-5 w-5 mt-0.5 ${config.color} ${paymentStatus.status === "processing" || paymentStatus.status === "pending" ? "animate-spin" : ""}`}
+          />
           <div>
             <p className="font-medium text-sm">{paymentStatus.message}</p>
             {paymentStatus.checkoutRequestId && (
@@ -869,21 +976,29 @@ export default function CheckoutPage() {
                 Reference: {paymentStatus.checkoutRequestId.slice(0, 16)}...
               </p>
             )}
-            {paymentStatus.resultDesc && paymentStatus.status !== 'invalid_credentials' && (
-              <p className="text-xs text-red-500 mt-1">
-                Error: {paymentStatus.resultDesc}
-              </p>
-            )}
-            {paymentStatus.status === 'pending' && (
+            {/* ✅ Only show error details for generic errors */}
+            {paymentStatus.resultDesc &&
+              paymentStatus.status !== "cancelled" && (
+                <p className="text-xs text-red-500 mt-1">
+                  Error: {paymentStatus.resultDesc}
+                </p>
+              )}
+            {paymentStatus.status === "pending" && (
               <div className="mt-2 flex items-center gap-2">
                 <div className="h-1.5 w-20 bg-gray-200 rounded overflow-hidden">
                   <motion.div
                     className="h-full bg-pink-600 rounded"
-                    animate={{ width: ['0%', '100%'] }}
-                    transition={{ duration: 30, repeat: Infinity, ease: 'linear' }}
+                    animate={{ width: ["0%", "100%"] }}
+                    transition={{
+                      duration: 30,
+                      repeat: Infinity,
+                      ease: "linear",
+                    }}
                   />
                 </div>
-                <span className="text-xs text-gray-500">Waiting for PIN...</span>
+                <span className="text-xs text-gray-500">
+                  Waiting for PIN...
+                </span>
               </div>
             )}
           </div>
@@ -891,14 +1006,17 @@ export default function CheckoutPage() {
       </motion.div>
     );
   };
-
   // ✅ Show empty cart state only when truly empty and not in payment flow
-  if (!hasCartItems && paymentStatus.status === 'idle' && !isLoading) {
+  if (!hasCartItems && paymentStatus.status === "idle" && !isLoading) {
     return (
       <div className="min-h-[60vh] flex flex-col items-center justify-center gap-4">
         <div className="text-center">
-          <h2 className="text-2xl font-semibold text-gray-600 dark:text-gray-400">Your cart is empty</h2>
-          <p className="text-gray-500 mt-2">Add some items to your cart before checking out</p>
+          <h2 className="text-2xl font-semibold text-gray-600 dark:text-gray-400">
+            Your cart is empty
+          </h2>
+          <p className="text-gray-500 mt-2">
+            Add some items to your cart before checking out
+          </p>
           <Link href="/products">
             <Button className="mt-4 bg-pink-600 hover:bg-pink-700 text-white">
               Browse Products
@@ -917,7 +1035,10 @@ export default function CheckoutPage() {
         <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
           <p className="text-sm text-blue-600 dark:text-blue-400">
             🛒 You're checking out as a guest.
-            <Link href="/auth/login" className="ml-2 font-medium hover:underline">
+            <Link
+              href="/auth/login"
+              className="ml-2 font-medium hover:underline"
+            >
               Sign in
             </Link>{" "}
             or{" "}
@@ -964,7 +1085,7 @@ export default function CheckoutPage() {
                     />
                   </div>
                 </div>
-                
+
                 <div className="space-y-2">
                   <Label htmlFor="phone">Phone Number *</Label>
                   <Input
@@ -981,7 +1102,8 @@ export default function CheckoutPage() {
                   {user && formData.phone && (
                     <p className="text-xs text-gray-500 flex items-center gap-1">
                       <Info className="h-3 w-3" />
-                      This is your registered phone number. You can update it in your profile.
+                      This is your registered phone number. You can update it in
+                      your profile.
                     </p>
                   )}
                 </div>
@@ -995,7 +1117,7 @@ export default function CheckoutPage() {
                   <MapPin className="h-5 w-5 text-pink-600" />
                   Delivery Address (Nairobi Area)
                 </h3>
-                
+
                 <div className="space-y-2">
                   <Label>Search Location</Label>
                   <div className="relative">
@@ -1040,7 +1162,7 @@ export default function CheckoutPage() {
                         )}
                       </Button>
                     </div>
-                    
+
                     <AnimatePresence>
                       {showLocationSearch && locationSuggestions.length > 0 && (
                         <motion.div
@@ -1066,12 +1188,17 @@ export default function CheckoutPage() {
                                   <MapPin className="h-4 w-4 text-pink-600 mt-1 shrink-0" />
                                   <div>
                                     <p className="text-sm font-medium text-gray-900 dark:text-white">
-                                      {location.address?.road || location.display_name.split(',')[0]}
+                                      {location.address?.road ||
+                                        location.display_name.split(",")[0]}
                                     </p>
                                     <p className="text-xs text-gray-500">
-                                      {location.address?.city || location.address?.town || ''}
-                                      {location.address?.suburb && `, ${location.address.suburb}`}
-                                      {location.address?.country && `, ${location.address.country}`}
+                                      {location.address?.city ||
+                                        location.address?.town ||
+                                        ""}
+                                      {location.address?.suburb &&
+                                        `, ${location.address.suburb}`}
+                                      {location.address?.country &&
+                                        `, ${location.address.country}`}
                                     </p>
                                   </div>
                                 </div>
@@ -1083,7 +1210,8 @@ export default function CheckoutPage() {
                     </AnimatePresence>
                   </div>
                   <p className="text-xs text-gray-500">
-                    Search for locations within Nairobi area or use the GPS button to detect your current location
+                    Search for locations within Nairobi area or use the GPS
+                    button to detect your current location
                   </p>
                 </div>
 
@@ -1098,7 +1226,7 @@ export default function CheckoutPage() {
                       setAddressUpdated(true);
                     }}
                     required
-                    className={addressUpdated ? 'border-green-500' : ''}
+                    className={addressUpdated ? "border-green-500" : ""}
                   />
                   {addressUpdated && (
                     <p className="text-xs text-green-600">✓ Address updated</p>
@@ -1136,10 +1264,15 @@ export default function CheckoutPage() {
                       type="checkbox"
                       id="saveAddress"
                       checked={saveAsDefaultAddress}
-                      onChange={(e) => setSaveAsDefaultAddress(e.target.checked)}
+                      onChange={(e) =>
+                        setSaveAsDefaultAddress(e.target.checked)
+                      }
                       className="rounded border-gray-300 text-pink-600 focus:ring-pink-500"
                     />
-                    <Label htmlFor="saveAddress" className="text-sm cursor-pointer">
+                    <Label
+                      htmlFor="saveAddress"
+                      className="text-sm cursor-pointer"
+                    >
                       Save this address as my default shipping address
                     </Label>
                   </div>
@@ -1154,14 +1287,14 @@ export default function CheckoutPage() {
                   <CreditCard className="h-5 w-5 text-pink-600" />
                   Payment Method
                 </h3>
-                
+
                 <RadioGroup
                   value={paymentMethod}
                   onValueChange={(value: any) => {
                     setPaymentMethod(value);
                     // ✅ Clear payment status when switching to cash
                     if (value === "cash") {
-                      setPaymentStatus({ status: 'idle', message: '' });
+                      setPaymentStatus({ status: "idle", message: "" });
                     }
                   }}
                   className="space-y-3"
@@ -1186,34 +1319,34 @@ export default function CheckoutPage() {
                       </span>
                     </Label>
                   </div>
-                  
+
                   {paymentMethod === "mpesa" && (
                     <motion.div
                       initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
+                      animate={{ opacity: 1, height: "auto" }}
                       exit={{ opacity: 0, height: 0 }}
                       className="pl-6 space-y-3"
                     >
                       <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg border border-blue-200 dark:border-blue-800">
                         <p className="text-sm text-gray-600 dark:text-gray-300">
-                          <span className="font-medium">M-Pesa Number:</span>{' '}
+                          <span className="font-medium">M-Pesa Number:</span>{" "}
                           {useDifferentPhone ? (
                             <span className="text-pink-600 font-medium">
-                              {differentPhone || 'Not set'}
+                              {differentPhone || "Not set"}
                             </span>
                           ) : (
                             <span className="text-pink-600 font-medium">
-                              {formData.phone || 'Not set'}
+                              {formData.phone || "Not set"}
                             </span>
                           )}
                         </p>
                         <p className="text-xs text-gray-500 mt-1">
-                          {useDifferentPhone 
-                            ? 'Using a different phone number for payment'
-                            : 'Using your registered phone number'}
+                          {useDifferentPhone
+                            ? "Using a different phone number for payment"
+                            : "Using your registered phone number"}
                         </p>
                       </div>
-                      
+
                       <div className="flex items-center gap-2">
                         <input
                           type="checkbox"
@@ -1227,14 +1360,19 @@ export default function CheckoutPage() {
                           }}
                           className="rounded border-gray-300 text-pink-600 focus:ring-pink-500"
                         />
-                        <Label htmlFor="differentPhone" className="text-sm cursor-pointer">
+                        <Label
+                          htmlFor="differentPhone"
+                          className="text-sm cursor-pointer"
+                        >
                           Use a different phone number for payment
                         </Label>
                       </div>
-                      
+
                       {useDifferentPhone && (
                         <div className="space-y-2">
-                          <Label htmlFor="mpesaPhone">M-Pesa Phone Number *</Label>
+                          <Label htmlFor="mpesaPhone">
+                            M-Pesa Phone Number *
+                          </Label>
                           <Input
                             id="mpesaPhone"
                             type="tel"
@@ -1244,7 +1382,7 @@ export default function CheckoutPage() {
                               setDifferentPhone(e.target.value);
                               setPhoneError("");
                             }}
-                            className={phoneError ? 'border-red-500' : ''}
+                            className={phoneError ? "border-red-500" : ""}
                           />
                           {phoneError && (
                             <p className="text-red-500 text-sm">{phoneError}</p>
@@ -1276,7 +1414,7 @@ export default function CheckoutPage() {
 
             {renderPaymentStatus()}
 
-            {paymentStatus.status === 'success' && receiptData && (
+            {paymentStatus.status === "success" && receiptData && (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -1293,7 +1431,7 @@ export default function CheckoutPage() {
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => router.push('/orders')}
+                  onClick={() => router.push("/orders")}
                   className="flex-1"
                 >
                   View Orders
@@ -1301,36 +1439,45 @@ export default function CheckoutPage() {
               </motion.div>
             )}
 
-            {paymentStatus.status === 'failed' || paymentStatus.status === 'cancelled' ? (
+            {paymentStatus.status === "failed" ||
+            paymentStatus.status === "cancelled" ? (
               <Button
                 type="button"
-                onClick={() => setPaymentStatus({ status: 'idle', message: '' })}
+                onClick={() =>
+                  setPaymentStatus({ status: "idle", message: "" })
+                }
                 className="w-full bg-pink-600 hover:bg-pink-700 text-white"
               >
                 Try Again
               </Button>
-            ) : paymentStatus.status !== 'success' && 
-              paymentStatus.status !== 'insufficient_funds' && 
-              paymentStatus.status !== 'invalid_credentials' && (
-              <Button
-                type="submit"
-                className="w-full bg-pink-600 hover:bg-pink-700 text-white text-lg py-6"
-                disabled={isLoading || paymentStatus.status === 'processing' || paymentStatus.status === 'pending'}
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                    Processing...
-                  </>
-                ) : paymentStatus.status === 'pending' ? (
-                  <>
-                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                    Waiting for Payment...
-                  </>
-                ) : (
-                  `Place Order • KSh ${total.toLocaleString()}`
-                )}
-              </Button>
+            ) : (
+              paymentStatus.status !== "success" &&
+              paymentStatus.status !== "insufficient_funds" &&
+              paymentStatus.status !== "invalid_credentials" && (
+                <Button
+                  type="submit"
+                  className="w-full bg-pink-600 hover:bg-pink-700 text-white text-lg py-6"
+                  disabled={
+                    isLoading ||
+                    paymentStatus.status === "processing" ||
+                    paymentStatus.status === "pending"
+                  }
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      Processing...
+                    </>
+                  ) : paymentStatus.status === "pending" ? (
+                    <>
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      Waiting for Payment...
+                    </>
+                  ) : (
+                    `Place Order • KSh ${total.toLocaleString()}`
+                  )}
+                </Button>
+              )
             )}
           </form>
         </div>

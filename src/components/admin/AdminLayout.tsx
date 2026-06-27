@@ -6,7 +6,7 @@ import { useRouter, usePathname } from 'next/navigation'
 import AdminSidebar from './AdminSidebar'
 import AdminNavbar from './AdminNavbar'
 import AdminFooter from './AdminFooter'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { useAuth } from '@/lib/hooks/useAuth'
 
 interface AdminLayoutProps {
@@ -19,12 +19,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const pathname = usePathname()
   const [sidebarOpen, setSidebarOpen] = useState(true)
   
-  // ✅ Use ref to track if auth check has been done
   const authChecked = useRef(false)
-  // ✅ Track if component is mounted
-  const isMounted = useRef(true)
 
-  // ✅ Memoize auth check to prevent unnecessary re-runs
   const checkAuth = useCallback(() => {
     if (authChecked.current) return
     
@@ -36,21 +32,16 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     }
   }, [user, isAdmin, isLoading, router])
 
-  // ✅ Only run auth check once on mount and when auth state changes
   useEffect(() => {
     checkAuth()
-  }, [checkAuth]) // ✅ Only depends on checkAuth
+  }, [checkAuth])
 
-  // ✅ Prevent re-renders when tab becomes active
+  // Prevent re-renders when tab becomes active
   useEffect(() => {
     const handleVisibilityChange = () => {
-      // Don't reload or re-check auth when tab becomes visible
-      // Just prevent any automatic actions
       if (document.hidden) {
-        // Tab is hidden - do nothing
         return
       }
-      // Tab is visible - don't force reload
     }
 
     document.addEventListener('visibilitychange', handleVisibilityChange)
@@ -60,43 +51,12 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     }
   }, [])
 
-  // ✅ Handle route changes without reloading
-  useEffect(() => {
-    // Don't reload on route change, just update the content
-    // The motion.div with key will handle the animation
-  }, [pathname])
-
-  // ✅ Memoize sidebar to prevent unnecessary re-renders
+  // Memoize components
   const sidebar = useMemo(() => <AdminSidebar />, [])
-
-  // ✅ Memoize navbar with stable callback
   const navbar = useMemo(() => (
-    <AdminNavbar 
-      sidebarOpen={sidebarOpen} 
-      setSidebarOpen={setSidebarOpen} 
-    />
+    <AdminNavbar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
   ), [sidebarOpen])
-
-  // ✅ Memoize main content to prevent re-renders
-  const mainContent = useMemo(() => (
-    <main 
-      className={`flex-1 p-6 transition-all duration-300 ${
-        sidebarOpen ? 'ml-64' : 'ml-0'
-      } pt-24 flex flex-col min-h-screen`}
-    >
-      <motion.div
-        key={pathname}
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3 }}
-        className="flex-1"
-      >
-        {children}
-      </motion.div>
-      
-      <AdminFooter />
-    </main>
-  ), [pathname, sidebarOpen, children])
+  const footer = useMemo(() => <AdminFooter />, [])
 
   if (isLoading) {
     return (
@@ -115,21 +75,27 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       {navbar}
       
       <div className="flex flex-1">
-        <AnimatePresence mode="wait">
-          {sidebarOpen && (
-            <motion.div
-              initial={{ x: -280 }}
-              animate={{ x: 0 }}
-              exit={{ x: -280 }}
-              transition={{ type: 'spring', damping: 20 }}
-              className="fixed left-0 top-0 z-40 h-full w-64 pt-16"
-            >
-              {sidebar}
-            </motion.div>
-          )}
-        </AnimatePresence>
+        <div className={`fixed left-0 top-0 z-40 h-full w-64 pt-16 transition-transform duration-300 ${
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}>
+          {sidebar}
+        </div>
 
-        {mainContent}
+        <main className={`flex-1 p-6 transition-all duration-300 ${
+          sidebarOpen ? 'ml-64' : 'ml-0'
+        } pt-24 flex flex-col min-h-screen`}>
+          <motion.div
+            key={pathname}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.2 }}
+            className="flex-1"
+          >
+            {children}
+          </motion.div>
+          
+          {footer}
+        </main>
       </div>
     </div>
   )
