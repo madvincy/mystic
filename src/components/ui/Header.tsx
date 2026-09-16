@@ -243,7 +243,7 @@ export default function Header() {
                 <div className="relative w-16 h-16 rounded-full overflow-hidden bg-gradient-to-r from-pink-600 to-purple-600 flex items-center justify-center">
                   <Image
                     src="/images/logos/main-logo.png"
-                    alt="Mystic Liqour Store"
+                    alt="Mystic Liquor Store"
                     width={100}
                     height={100}
                     className="object-cover"
@@ -252,7 +252,7 @@ export default function Header() {
                 </div>
                 <div className="flex flex-col items-center">
                   <span className="text-l font-display font-bold text-pink-600 dark:text-pink-400 group-hover:scale-105 transition-transform tracking-wide drop-shadow-[0_0_10px_rgba(236,72,153,0.3)]">
-                    Mystic Liqour Store
+                    Mystic Liquor Store
                   </span>
                   {/* Business Mission - Centered below the store name */}
                   <motion.span

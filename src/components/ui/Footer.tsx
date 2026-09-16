@@ -273,7 +273,7 @@ export default function Footer() {
               <div className="relative w-16 h-16 rounded-full overflow-hidden bg-gradient-to-r from-pink-600 to-purple-600 flex items-center justify-center flex-shrink-0">
                 <Image
                   src="/images/logos/main-logo.png"
-                  alt="Mystic Liqour Store"
+                  alt="Mystic Liquor Store"
                   width={100}
                   height={100}
                   className="object-cover"
@@ -281,8 +281,8 @@ export default function Footer() {
                 />
               </div>
               <div className="flex flex-col">
-                <span className="text-xl font-display font-bold text-pink-600 dark:text-pink-400 tracking-wide">
-                  Mystic Store
+                <span className="text-xs font-display font-bold text-pink-600 dark:text-pink-400 tracking-wide">
+                  Mystic Liquor Store
                 </span>
                 <motion.span
                   initial={{ opacity: 0, y: 5 }}
