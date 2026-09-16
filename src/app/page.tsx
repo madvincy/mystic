@@ -561,10 +561,9 @@ export default function Home() {
           <div className="relative flex items-center justify-center mb-10">
             <div className="flex items-center gap-3">
               <BookOpen className="h-7 w-7 text-pink-600" />
-              <h2 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent">
+              <h2 className="text-3xl md:text-4xl font-bold">
                 Latest from Our Blog
               </h2>
-              <BookOpen className="h-7 w-7 text-purple-600" />
             </div>
             <Link href="/blog" className="absolute right-0">
               <Button

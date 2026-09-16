@@ -87,7 +87,7 @@ export default function Footer() {
           .order("created_at", { ascending: true });
 
         if (error) throw error;
-        
+
         const links = data || [];
         setSocialLinks(links);
         // ✅ Cache for 5 minutes
@@ -178,7 +178,7 @@ export default function Footer() {
             .eq("id", existing.id);
 
           if (updateError) throw updateError;
-          
+
           toast.success("Welcome back! You've been resubscribed 🎉");
           setSubscribed(true);
           setEmail("");
@@ -369,12 +369,12 @@ export default function Footer() {
               <h4 className="font-semibold text-lg mb-4 text-pink-400">
                 {title}
               </h4>
-              <ul className="space-y-2">
+              <ul className="space-y-1">
                 {links.map((link) => (
                   <li key={link.name}>
                     <Link
                       href={link.href}
-                      className="text-gray-400 hover:text-pink-400 transition-colors text-sm"
+                      className="inline-block text-gray-400 hover:text-pink-400 hover:bg-gray-800 transition-colors text-sm px-2 py-1 -mx-2 rounded-md"
                     >
                       {link.name}
                     </Link>
@@ -480,35 +480,35 @@ export default function Footer() {
           <div className="flex items-center gap-4">
             <span className="text-sm text-gray-400">We accept:</span>
             <div className="flex gap-3">
-              <img
-                src="/images/mpesa.png"
-                alt="M-Pesa"
-                className="h-8 bg-white rounded p-1"
-              />
-              <img
-                src="/images/visa.png"
-                alt="Visa"
-                className="h-8 bg-white rounded p-1"
-              />
-              <img
-                src="/images/mastercard.png"
-                alt="Mastercard"
-                className="h-8 bg-white rounded p-1"
-              />
+              {[
+                { src: "/images/mpesa.png", alt: "M-Pesa" },
+                { src: "/images/visa.png", alt: "Visa" },
+                { src: "/images/mastercard.png", alt: "Mastercard" },
+              ].map((payment) => (
+                <div
+                  key={payment.alt}
+                  className="w-14 h-9 bg-white rounded flex items-center justify-center p-1.5 shrink-0"
+                >
+                  <img
+                    src={payment.src}
+                    alt={payment.alt}
+                    className="w-full h-full object-contain"
+                  />
+                </div>
+              ))}
             </div>
           </div>
           <div className="flex items-center gap-4 text-sm text-gray-400">
-            <Link href="/privacy" className="hover:text-pink-400">
+            <Link href="/privacy" className="hover:text-pink-400 hover:bg-gray-800 px-2 py-1 -mx-2 rounded-md transition-colors">
               Privacy Policy
             </Link>
             <span>•</span>
-            <Link href="/terms" className="hover:text-pink-400">
+            <Link href="/terms" className="hover:text-pink-400 hover:bg-gray-800 px-2 py-1 -mx-2 rounded-md transition-colors">
               Terms
             </Link>
             <span>•</span>
             <p>
-              &copy; {new Date().getFullYear()} Mystic Wines. All rights
-              reserved.
+              &copy; {new Date().getFullYear()} Mystic Wines. All rights reserved.
             </p>
           </div>
         </div>

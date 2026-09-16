@@ -409,18 +409,20 @@ export default function ProductCard({
         <div className="mt-3">
           <Button
             onClick={handleAddToCart}
-            className="w-full bg-pink-600 hover:bg-pink-700 text-white text-sm transition-all"
+            className="w-full bg-pink-600 hover:bg-pink-700 text-white text-[11px] sm:text-xs md:text-sm px-2 h-8 md:h-9 transition-all"
             disabled={isOutOfStock}
           >
             {isAdded ? (
               <>
-                <Check className="h-4 w-4 mr-1" />
-                Added!
+                <Check className="h-3.5 w-3.5 md:h-4 md:w-4 mr-1 shrink-0" />
+                <span className="truncate">Added!</span>
               </>
             ) : (
               <>
-                <ShoppingCart className="h-4 w-4 mr-1" />
-                {isOutOfStock ? 'Out of Stock' : 'ADD TO CART'}
+                <ShoppingCart className="h-3.5 w-3.5 md:h-4 md:w-4 mr-1 shrink-0" />
+                <span className="truncate">
+                  {isOutOfStock ? 'Out of Stock' : 'Add to Cart'}
+                </span>
               </>
             )}
           </Button>

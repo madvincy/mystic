@@ -80,9 +80,8 @@ const categoryStructure = {
 const otherCategories = [
   { name: "Energy Drinks", slug: "energy-drinks" },
   { name: "Merchandise", slug: "merchandise" },
-  { name: "Cigarattes", slug: "Vape" },
-  { name: "Gift Sets", slug: "gifts" },
-  { name: "Accessories", slug: "accessories" },
+  { name: "Nicotine", slug: "nicotine" },
+  { name: "Jaba Juice", slug: "jaba juice" }
 ];
 
 export default function Header() {
@@ -143,8 +142,8 @@ export default function Header() {
 
   // Navigation items
   const navigation = [
-    // { name: "GIFTS", href: "/gifts" },
-    { name: "BLOG", href: "/blog" },
+    { name: "GIFTS", href: "/gifts" },
+    // { name: "BLOG", href: "/blog" },
     // { name: "CONTACT", href: "/contact" },
   ];
 
@@ -207,14 +206,31 @@ export default function Header() {
     return categoryMap[categoryName as keyof typeof categoryMap] || "";
   };
 
+  // ✅ Shared trigger classes so Wine/Beer/Spirits/GIFTS all look and behave
+  // the same way for hover + active state (parent tab activates when any
+  // of its own subcategories is the active route — same logic GIFTS uses
+  // via isActive, just category-aware via isCategoryActive).
+  const navTriggerClasses = (active: boolean) =>
+    cn(
+      "flex items-center gap-1 text-l font-medium transition-colors py-2 px-3 rounded-lg relative group",
+      active
+        ? "text-pink-600 dark:text-pink-400 bg-pink-50 dark:bg-pink-900/20"
+        : "text-gray-700 dark:text-gray-300 hover:text-pink-600 dark:hover:text-pink-400 hover:bg-pink-50 dark:hover:bg-pink-900/20",
+    );
+
+  const navUnderlineClasses = (active: boolean) =>
+    cn(
+      "absolute -bottom-1 left-3 right-3 h-0.5 bg-pink-600 transition-all duration-300",
+      active ? "opacity-100" : "opacity-0 group-hover:opacity-100",
+    );
+
   return (
     <>
       <header
-        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-          isScrolled
+        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${isScrolled
             ? "bg-white/95 dark:bg-gray-900/95 backdrop-blur-md shadow-md"
             : "bg-white dark:bg-gray-900"
-        } border-b border-gray-200 dark:border-gray-800`}
+          } border-b border-gray-200 dark:border-gray-800`}
       >
         <div className="container mx-auto px-4">
           <div className="flex items-center justify-between h-20">
@@ -252,7 +268,7 @@ export default function Header() {
             </Link>
 
             {/* Desktop Navigation with Dropdowns */}
-            <nav className="hidden lg:flex items-center gap-6">
+            <nav className="hidden lg:flex items-center gap-2">
               {/* Wine Dropdown */}
               <div
                 className="relative group"
@@ -261,20 +277,16 @@ export default function Header() {
               >
                 <Link
                   href={`/products?category=${getCategorySlug("Wine")}`}
-                  className={cn(
-                    "flex items-center gap-1 text-l font-medium transition-colors py-2",
-                    isCategoryActive("Wine")
-                      ? "text-pink-600 dark:text-pink-400"
-                      : "text-gray-700 dark:text-gray-300 hover:text-pink-600 dark:hover:text-pink-400",
-                  )}
+                  className={navTriggerClasses(isCategoryActive("Wine"))}
                 >
                   <Wine className="h-4 w-4" />
                   Wine
                   <ChevronDown
-                    className={`h-3 w-3 transition-transform duration-200 ${
-                      hoveredCategory === "wine" ? "rotate-180" : ""
-                    }`}
+                    className={`h-3 w-3 transition-transform duration-200 ${hoveredCategory === "wine" ? "rotate-180" : ""
+                      }`}
                   />
+                  {/* ✅ Active underline — same treatment as GIFTS */}
+                  <span className={navUnderlineClasses(isCategoryActive("Wine"))} />
                   {isCategoryActive("Wine") && (
                     <span className="absolute -top-1 -right-1 h-2 w-2 bg-pink-600 rounded-full animate-pulse" />
                   )}
@@ -326,20 +338,16 @@ export default function Header() {
               >
                 <Link
                   href={`/products?category=${getCategorySlug("Beer")}`}
-                  className={cn(
-                    "flex items-center gap-1 text-l font-medium transition-colors py-2",
-                    isCategoryActive("Beer")
-                      ? "text-pink-600 dark:text-pink-400"
-                      : "text-gray-700 dark:text-gray-300 hover:text-pink-600 dark:hover:text-pink-400",
-                  )}
+                  className={navTriggerClasses(isCategoryActive("Beer"))}
                 >
                   <Beer className="h-4 w-4" />
                   Beer
                   <ChevronDown
-                    className={`h-3 w-3 transition-transform duration-200 ${
-                      hoveredCategory === "beer" ? "rotate-180" : ""
-                    }`}
+                    className={`h-3 w-3 transition-transform duration-200 ${hoveredCategory === "beer" ? "rotate-180" : ""
+                      }`}
                   />
+                  {/* ✅ Active underline — same treatment as GIFTS */}
+                  <span className={navUnderlineClasses(isCategoryActive("Beer"))} />
                   {isCategoryActive("Beer") && (
                     <span className="absolute -top-1 -right-1 h-2 w-2 bg-pink-600 rounded-full animate-pulse" />
                   )}
@@ -391,20 +399,16 @@ export default function Header() {
               >
                 <Link
                   href={`/products?category=${getCategorySlug("Spirits")}`}
-                  className={cn(
-                    "flex items-center gap-1 text-l font-medium transition-colors py-2",
-                    isCategoryActive("Spirits")
-                      ? "text-pink-600 dark:text-pink-400"
-                      : "text-gray-700 dark:text-gray-300 hover:text-pink-600 dark:hover:text-pink-400",
-                  )}
+                  className={navTriggerClasses(isCategoryActive("Spirits"))}
                 >
                   <Martini className="h-4 w-4" />
                   Spirits
                   <ChevronDown
-                    className={`h-3 w-3 transition-transform duration-200 ${
-                      hoveredCategory === "spirits" ? "rotate-180" : ""
-                    }`}
+                    className={`h-3 w-3 transition-transform duration-200 ${hoveredCategory === "spirits" ? "rotate-180" : ""
+                      }`}
                   />
+                  {/* ✅ Active underline — same treatment as GIFTS */}
+                  <span className={navUnderlineClasses(isCategoryActive("Spirits"))} />
                   {isCategoryActive("Spirits") && (
                     <span className="absolute -top-1 -right-1 h-2 w-2 bg-pink-600 rounded-full animate-pulse" />
                   )}
@@ -454,13 +458,17 @@ export default function Header() {
                 onMouseEnter={() => setShowMoreMenu(true)}
                 onMouseLeave={() => setShowMoreMenu(false)}
               >
-                <button className="flex items-center gap-1 text-l font-medium hover:text-pink-600 dark:hover:text-pink-400 transition-colors py-2">
+                <button
+                  className={cn(
+                    "flex items-center gap-1 text-l font-medium transition-colors py-2 px-3 rounded-lg",
+                    "text-gray-700 dark:text-gray-300 hover:text-pink-600 dark:hover:text-pink-400 hover:bg-pink-50 dark:hover:bg-pink-900/20",
+                  )}
+                >
                   <MoreHorizontal className="h-4 w-4" />
                   More
                   <ChevronDown
-                    className={`h-3 w-3 transition-transform duration-200 ${
-                      showMoreMenu ? "rotate-180" : ""
-                    }`}
+                    className={`h-3 w-3 transition-transform duration-200 ${showMoreMenu ? "rotate-180" : ""
+                      }`}
                   />
                 </button>
                 <AnimatePresence>
@@ -509,22 +517,12 @@ export default function Header() {
                   <Link
                     key={item.name}
                     href={item.href}
-                    className={cn(
-                      "text-l font-medium transition-colors relative group py-2",
-                      active
-                        ? "text-pink-600 dark:text-pink-400"
-                        : "text-gray-700 dark:text-gray-300 hover:text-pink-600 dark:hover:text-pink-400",
-                    )}
+                    className={navTriggerClasses(active)}
                   >
                     {item.name}
-                    <span
-                      className={cn(
-                        "absolute -bottom-1 left-0 h-0.5 bg-pink-600 transition-all duration-300",
-                        active ? "w-full" : "w-0 group-hover:w-full",
-                      )}
-                    />
+                    <span className={navUnderlineClasses(active)} />
                     {active && item.name !== "HOME" && (
-                      <span className="absolute -top-1 -right-2 h-2 w-2 bg-pink-600 rounded-full animate-pulse" />
+                      <span className="absolute -top-1 -right-1 h-2 w-2 bg-pink-600 rounded-full animate-pulse" />
                     )}
                   </Link>
                 );
@@ -533,19 +531,27 @@ export default function Header() {
 
             {/* ✅ Actions - Desktop & Mobile */}
             <div className="flex items-center gap-2 md:gap-4">
-              {/* Search - Desktop only */}
+              {/* Search - Desktop only, with dedicated search button */}
               <form
                 onSubmit={handleSearch}
-                className="hidden md:block relative"
+                className="hidden md:flex items-center relative"
               >
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
                 <Input
                   type="text"
                   placeholder="Search products..."
-                  className="pl-10 pr-4 py-2 w-48 lg:w-64 rounded-full border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 focus:ring-2 focus:ring-pink-500"
+                  className="pl-10 pr-10 py-2 w-48 lg:w-64 rounded-full border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 focus:ring-2 focus:ring-pink-500"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
+                <button
+                  type="submit"
+                  aria-label="Search"
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 h-7 w-7 flex items-center justify-center rounded-full bg-pink-600 hover:bg-pink-700 text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  disabled={!searchQuery.trim()}
+                >
+                  <Search className="h-3.5 w-3.5" />
+                </button>
               </form>
 
               {/* ✅ Theme Toggle - Hidden on mobile (already in mobile menu) */}
@@ -559,7 +565,7 @@ export default function Header() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="rounded-full relative"
+                    className="rounded-full relative hover:bg-pink-50 dark:hover:bg-pink-900/20 hover:text-pink-600 dark:hover:text-pink-400"
                   >
                     <Heart className="h-5 w-5" />
                   </Button>
@@ -570,7 +576,7 @@ export default function Header() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="hidden md:block rounded-full relative"
+                className="hidden md:block rounded-full relative hover:bg-pink-50 dark:hover:bg-pink-900/20 hover:text-pink-600 dark:hover:text-pink-400"
                 onClick={handleCartToggle}
               >
                 <ShoppingBag className="h-5 w-5" />
@@ -590,7 +596,7 @@ export default function Header() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="rounded-full relative"
+                    className="rounded-full relative hover:bg-pink-50 dark:hover:bg-pink-900/20 hover:text-pink-600 dark:hover:text-pink-400"
                   >
                     <User className="h-5 w-5" />
                     {user && (
@@ -609,14 +615,14 @@ export default function Header() {
                     <div className="p-2">
                       <Link
                         href="/profile"
-                        className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-sm"
+                        className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-pink-50 dark:hover:bg-pink-900/20 hover:text-pink-600 dark:hover:text-pink-400 text-sm"
                       >
                         <User className="h-4 w-4" />
                         Profile
                       </Link>
                       <Link
                         href="/orders"
-                        className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-sm"
+                        className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-pink-50 dark:hover:bg-pink-900/20 hover:text-pink-600 dark:hover:text-pink-400 text-sm"
                       >
                         <ShoppingBag className="h-4 w-4" />
                         Orders
@@ -624,7 +630,7 @@ export default function Header() {
                       {isAdmin && (
                         <Link
                           href="/admin"
-                          className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-sm text-pink-600"
+                          className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-pink-50 dark:hover:bg-pink-900/20 text-sm text-pink-600"
                         >
                           <Settings className="h-4 w-4" />
                           Admin Panel
@@ -646,7 +652,7 @@ export default function Header() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="lg:hidden rounded-full"
+                className="lg:hidden rounded-full hover:bg-pink-50 dark:hover:bg-pink-900/20 hover:text-pink-600 dark:hover:text-pink-400"
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               >
                 {isMobileMenuOpen ? (

@@ -80,53 +80,21 @@ export const fetchCategoryImages = createAsyncThunk(
 // ============ FETCH PRODUCTS WITH ALL DATA ============
 export const fetchProducts = createAsyncThunk(
   'products/fetchProducts',
-  async (_, { rejectWithValue }) => {
-    try {
-      // console.log('🔄 [productSlice] Starting fetchProducts...')
-      
-      // Check IndexedDB first
-      const db = await getDB()
-      
-      // Safely try to get cached products
-      let cached = []
-      try {
-        if (db.objectStoreNames.contains('products')) {
-          cached = await db.getAll('products')
-        }
-      } catch (cacheError) {
-        // console.warn('⚠️ [productSlice] Could not read from cache:', cacheError)
-      }
-      
-      if (cached && cached.length > 0) {
-        // console.log('📦 [productSlice] Products loaded from cache:', cached.length)
-        
-        // Try to get other data from cache
-        let discounts = []
-        let flashSales = []
-        let featured = []
-        
-        try {
-          if (db.objectStoreNames.contains('discounts')) {
-            discounts = await db.getAll('discounts')
-          }
-          if (db.objectStoreNames.contains('flash_sales')) {
-            flashSales = await db.getAll('flash_sales')
-          }
-          if (db.objectStoreNames.contains('featured_products')) {
-            featured = await db.getAll('featured_products')
-          }
-        } catch (cacheError) {
-          // console.warn('⚠️ [productSlice] Could not read related data from cache:', cacheError)
-        }
-        
-        // Enrich cached products with discount/flash sale data
-        const enriched = enrichProductsWithDiscounts(cached, discounts, flashSales, featured)
-        return { products: enriched, fromCache: true }
-      }
+  async (_, { rejectWithValue, dispatch }) => {
+    const db = await getDB()
 
-      // console.log('🌐 [productSlice] Fetching from Supabase...')
-      
-      // Fetch from Supabase with all related data
+    // Try cache first, for instant paint
+    let cached: any[] = []
+    try {
+      if (db.objectStoreNames.contains('products')) {
+        cached = await db.getAll('products')
+      }
+    } catch (cacheError) {
+      // ignore
+    }
+
+    // Always attempt a fresh fetch — don't return early on cache hit
+    try {
       const [productsRes, discountsRes, flashSalesRes, featuredRes] = await Promise.all([
         supabase
           .from('products')
@@ -143,34 +111,17 @@ export const fetchProducts = createAsyncThunk(
           .gte('end_date', new Date().toISOString()),
         supabase
           .from('flash_sales')
-          .select(`
-            *,
-            products:flash_sale_products(
-              *,
-              product:products(*),
-              variant:product_variants(*)
-            )
-          `)
+          .select(`*, products:flash_sale_products(*, product:products(*), variant:product_variants(*))`)
           .eq('is_active', true)
           .gte('end_time', new Date().toISOString()),
         supabase
           .from('featured_products')
-          .select(`
-            *,
-            product:products(*),
-            variant:product_variants(*)
-          `)
+          .select(`*, product:products(*), variant:product_variants(*)`)
           .eq('is_active', true)
       ])
 
-      if (productsRes.error) {
-        // console.error('❌ [productSlice] Products fetch error:', productsRes.error)
-        throw productsRes.error
-      }
+      if (productsRes.error) throw productsRes.error
 
-      // console.log('✅ [productSlice] Products fetched:', productsRes.data?.length || 0)
-
-      // Enrich products with discounts and flash sales
       const enriched = enrichProductsWithDiscounts(
         productsRes.data || [],
         discountsRes.data || [],
@@ -178,7 +129,6 @@ export const fetchProducts = createAsyncThunk(
         featuredRes.data || []
       )
 
-      // Cache everything in IndexedDB
       try {
         await Promise.all([
           batchSaveToCache('products', enriched),
@@ -187,12 +137,15 @@ export const fetchProducts = createAsyncThunk(
           batchSaveToCache('featured_products', featuredRes.data || [])
         ])
       } catch (cacheError) {
-        // console.warn('⚠️ [productSlice] Could not cache data:', cacheError)
+        // non-fatal
       }
 
       return { products: enriched, fromCache: false }
     } catch (error: any) {
-      // console.error('❌ [productSlice] Fetch error:', error)
+      // Network fetch failed — fall back to cache if we have it
+      if (cached && cached.length > 0) {
+        return { products: cached, fromCache: true }
+      }
       return rejectWithValue(error.message)
     }
   }
