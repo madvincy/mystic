@@ -144,7 +144,7 @@ export default function Header() {
   // Navigation items
   const navigation = [
     // { name: "GIFTS", href: "/gifts" },
-    // { name: "BLOG", href: "/blog" },
+    { name: "BLOG", href: "/blog" },
     // { name: "CONTACT", href: "/contact" },
   ];
 
