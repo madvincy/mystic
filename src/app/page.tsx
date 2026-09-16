@@ -339,7 +339,7 @@ export default function Home() {
             products={featured}
             loading={loading}
             showDiscountBadge
-            columns={5} // ✅ Changed from 4 to 5
+            columns={6} // ✅ Changed from 4 to 5
           />
         </section>
       )}

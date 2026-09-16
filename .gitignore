@@ -45,3 +45,4 @@ supabase/.env
 # logs
 logs
 *.log
+.env*

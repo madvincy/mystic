@@ -143,9 +143,9 @@ export default function Header() {
 
   // Navigation items
   const navigation = [
-    { name: "GIFTS", href: "/gifts" },
-    { name: "BLOG", href: "/blog" },
-    { name: "CONTACT", href: "/contact" },
+    // { name: "GIFTS", href: "/gifts" },
+    // { name: "BLOG", href: "/blog" },
+    // { name: "CONTACT", href: "/contact" },
   ];
 
   // Helper to check if path is active
@@ -235,7 +235,7 @@ export default function Header() {
                   />
                 </div>
                 <div className="flex flex-col items-center">
-                  <span className="text-xl font-display font-bold text-pink-600 dark:text-pink-400 group-hover:scale-105 transition-transform tracking-wide drop-shadow-[0_0_10px_rgba(236,72,153,0.3)]">
+                  <span className="text-l font-display font-bold text-pink-600 dark:text-pink-400 group-hover:scale-105 transition-transform tracking-wide drop-shadow-[0_0_10px_rgba(236,72,153,0.3)]">
                     Mystic Liqour Store
                   </span>
                   {/* Business Mission - Centered below the store name */}
@@ -262,7 +262,7 @@ export default function Header() {
                 <Link
                   href={`/products?category=${getCategorySlug("Wine")}`}
                   className={cn(
-                    "flex items-center gap-1 text-xl font-medium transition-colors py-2",
+                    "flex items-center gap-1 text-l font-medium transition-colors py-2",
                     isCategoryActive("Wine")
                       ? "text-pink-600 dark:text-pink-400"
                       : "text-gray-700 dark:text-gray-300 hover:text-pink-600 dark:hover:text-pink-400",
@@ -297,7 +297,7 @@ export default function Header() {
                             key={sub.slug}
                             href={`/products?subcategory=${sub.slug}`}
                             className={cn(
-                              "block px-4 py-2 text-xl transition-colors",
+                              "block px-4 py-2 text-l transition-colors",
                               isSubActive
                                 ? "bg-pink-50 dark:bg-pink-900/20 text-pink-600 dark:text-pink-400 font-medium"
                                 : "hover:bg-pink-50 dark:hover:bg-pink-900/20 hover:text-pink-600",
@@ -327,7 +327,7 @@ export default function Header() {
                 <Link
                   href={`/products?category=${getCategorySlug("Beer")}`}
                   className={cn(
-                    "flex items-center gap-1 text-xl font-medium transition-colors py-2",
+                    "flex items-center gap-1 text-l font-medium transition-colors py-2",
                     isCategoryActive("Beer")
                       ? "text-pink-600 dark:text-pink-400"
                       : "text-gray-700 dark:text-gray-300 hover:text-pink-600 dark:hover:text-pink-400",
@@ -362,7 +362,7 @@ export default function Header() {
                             key={sub.slug}
                             href={`/products?subcategory=${sub.slug}`}
                             className={cn(
-                              "block px-4 py-2 text-xl transition-colors",
+                              "block px-4 py-2 text-l transition-colors",
                               isSubActive
                                 ? "bg-pink-50 dark:bg-pink-900/20 text-pink-600 dark:text-pink-400 font-medium"
                                 : "hover:bg-pink-50 dark:hover:bg-pink-900/20 hover:text-pink-600",
@@ -392,7 +392,7 @@ export default function Header() {
                 <Link
                   href={`/products?category=${getCategorySlug("Spirits")}`}
                   className={cn(
-                    "flex items-center gap-1 text-xl font-medium transition-colors py-2",
+                    "flex items-center gap-1 text-l font-medium transition-colors py-2",
                     isCategoryActive("Spirits")
                       ? "text-pink-600 dark:text-pink-400"
                       : "text-gray-700 dark:text-gray-300 hover:text-pink-600 dark:hover:text-pink-400",
@@ -427,7 +427,7 @@ export default function Header() {
                             key={sub.slug}
                             href={`/products?subcategory=${sub.slug}`}
                             className={cn(
-                              "block px-4 py-2 text-xl transition-colors",
+                              "block px-4 py-2 text-l transition-colors",
                               isSubActive
                                 ? "bg-pink-50 dark:bg-pink-900/20 text-pink-600 dark:text-pink-400 font-medium"
                                 : "hover:bg-pink-50 dark:hover:bg-pink-900/20 hover:text-pink-600",
@@ -454,7 +454,7 @@ export default function Header() {
                 onMouseEnter={() => setShowMoreMenu(true)}
                 onMouseLeave={() => setShowMoreMenu(false)}
               >
-                <button className="flex items-center gap-1 text-xl font-medium hover:text-pink-600 dark:hover:text-pink-400 transition-colors py-2">
+                <button className="flex items-center gap-1 text-l font-medium hover:text-pink-600 dark:hover:text-pink-400 transition-colors py-2">
                   <MoreHorizontal className="h-4 w-4" />
                   More
                   <ChevronDown
@@ -481,7 +481,7 @@ export default function Header() {
                             key={cat.slug}
                             href={`/products?category=${cat.slug}`}
                             className={cn(
-                              "block px-4 py-2 text-xl transition-colors",
+                              "block px-4 py-2 text-l transition-colors",
                               isActive
                                 ? "bg-pink-50 dark:bg-pink-900/20 text-pink-600 dark:text-pink-400 font-medium"
                                 : "hover:bg-pink-50 dark:hover:bg-pink-900/20 hover:text-pink-600",
@@ -510,7 +510,7 @@ export default function Header() {
                     key={item.name}
                     href={item.href}
                     className={cn(
-                      "text-xl font-medium transition-colors relative group py-2",
+                      "text-l font-medium transition-colors relative group py-2",
                       active
                         ? "text-pink-600 dark:text-pink-400"
                         : "text-gray-700 dark:text-gray-300 hover:text-pink-600 dark:hover:text-pink-400",

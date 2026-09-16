@@ -23,9 +23,9 @@ interface ProductGridProps {
   limit?: number
 }
 
-export default function ProductGrid({ 
-  products, 
-  loading = false, 
+export default function ProductGrid({
+  products,
+  loading = false,
   showDiscountBadge = false,
   showTimer = false,
   columns = 4,
@@ -44,14 +44,14 @@ export default function ProductGrid({
     let filtered = products
 
     if (categoryFilter) {
-      filtered = filtered.filter(product => 
-        product.category?.slug === categoryFilter || 
+      filtered = filtered.filter(product =>
+        product.category?.slug === categoryFilter ||
         product.category_id === categoryFilter
       )
     }
 
     if (subcategoryFilter) {
-      filtered = filtered.filter(product => 
+      filtered = filtered.filter(product =>
         product.subcategory?.slug === subcategoryFilter ||
         product.subcategory_id === subcategoryFilter
       )
@@ -72,10 +72,10 @@ export default function ProductGrid({
     switch (columns) {
       case 2: return 'grid-cols-2'
       case 3: return 'grid-cols-2 md:grid-cols-3'
-      case 4: return 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4'
-      case 5: return 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5'
-      case 6: return 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-6'
-      default: return 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4'
+      case 4: return 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5'
+      case 5: return 'grid-cols-3 sm:grid-cols-4 lg:grid-cols-6'
+      case 6: return 'grid-cols-3 sm:grid-cols-4 lg:grid-cols-7'
+      default: return 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5'
     }
   }
 

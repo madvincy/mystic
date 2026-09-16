@@ -21,8 +21,8 @@ interface ProductCardProps {
   className?: string
 }
 
-export default function ProductCard({ 
-  product, 
+export default function ProductCard({
+  product,
   showDiscountBadge = false,
   showTimer = false,
   variant = 'default',
@@ -66,14 +66,14 @@ export default function ProductCard({
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    
+
     if (isOutOfStock) {
       toast.error('Out of stock')
       return
     }
 
     const price = selectedVariant?.price || product.sale_price || product.price
-    
+
     dispatch(addItem({
       id: selectedVariant?.id || product.id,
       productId: product.id,
@@ -85,7 +85,7 @@ export default function ProductCard({
       image: product.images?.[0] || '/images/placeholder.jpg',
       stock: stock,
     }))
-    
+
     setIsAdded(true)
     toast.success('Added to cart! 🛒')
     setTimeout(() => setIsAdded(false), 2000)
@@ -270,16 +270,16 @@ export default function ProductCard({
             className="object-cover transition-transform duration-500 group-hover:scale-105"
             onError={() => setImageError(true)}
           />
-          
+
           {/* Quick View Overlay */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: isHovered ? 1 : 0 }}
             className="absolute inset-0 bg-black/40 flex items-center justify-center"
           >
-            <Button 
-              variant="secondary" 
-              size="sm" 
+            <Button
+              variant="secondary"
+              size="sm"
               className="gap-2"
               onClick={(e) => {
                 e.preventDefault()
@@ -318,7 +318,7 @@ export default function ProductCard({
 
           {/* Wishlist Button */}
           <div className="absolute top-2 right-2">
-            <WishlistButton 
+            <WishlistButton
               productId={product.id}
               variantId={selectedVariant?.id || null}
             />
@@ -327,9 +327,9 @@ export default function ProductCard({
       </Link>
 
       {/* Content */}
-      <div className="p-4">
+      <div className="p-4 border-t border-pink-100 dark:border-transparent">
         <Link href={`/products/${product.slug}`}>
-          <h3 className="font-semibold text-sm md:text-base line-clamp-1 hover:text-pink-600 transition">
+          <h3 className="font-medium text-xs md:text-sm line-clamp-2 hover:text-pink-600 transition">
             {product.name}
           </h3>
         </Link>
