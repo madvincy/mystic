@@ -210,17 +210,20 @@ export default function Header() {
   // the same way for hover + active state (parent tab activates when any
   // of its own subcategories is the active route — same logic GIFTS uses
   // via isActive, just category-aware via isCategoryActive).
+  // "nav-link" / "nav-link-active" are stable hooks used by globals.css as
+  // a CSS fallback in case the Tailwind hover:/dark: utilities below don't
+  // get generated in the build (see FIX: HEADER NAV HOVER/ACTIVE STATES).
   const navTriggerClasses = (active: boolean) =>
     cn(
-      "flex items-center gap-1 text-l font-medium transition-colors py-2 px-3 rounded-lg relative group",
+      "nav-link flex items-center gap-1 text-l font-medium transition-colors py-2 px-3 rounded-lg relative group",
       active
-        ? "text-pink-600 dark:text-pink-400 bg-pink-50 dark:bg-pink-900/20"
+        ? "nav-link-active text-pink-600 dark:text-pink-400 bg-pink-50 dark:bg-pink-900/20"
         : "text-gray-700 dark:text-gray-300 hover:text-pink-600 dark:hover:text-pink-400 hover:bg-pink-50 dark:hover:bg-pink-900/20",
     );
 
   const navUnderlineClasses = (active: boolean) =>
     cn(
-      "absolute -bottom-1 left-3 right-3 h-0.5 bg-pink-600 transition-all duration-300",
+      "nav-underline absolute -bottom-1 left-3 right-3 h-0.5 bg-pink-600 transition-all duration-300",
       active ? "opacity-100" : "opacity-0 group-hover:opacity-100",
     );
 
@@ -309,9 +312,9 @@ export default function Header() {
                             key={sub.slug}
                             href={`/products?subcategory=${sub.slug}`}
                             className={cn(
-                              "block px-4 py-2 text-l transition-colors",
+                              "dropdown-item block px-4 py-2 text-l transition-colors",
                               isSubActive
-                                ? "bg-pink-50 dark:bg-pink-900/20 text-pink-600 dark:text-pink-400 font-medium"
+                                ? "dropdown-item-active bg-pink-50 dark:bg-pink-900/20 text-pink-600 dark:text-pink-400 font-medium"
                                 : "hover:bg-pink-50 dark:hover:bg-pink-900/20 hover:text-pink-600",
                             )}
                             onClick={() => setHoveredCategory(null)}
@@ -370,9 +373,9 @@ export default function Header() {
                             key={sub.slug}
                             href={`/products?subcategory=${sub.slug}`}
                             className={cn(
-                              "block px-4 py-2 text-l transition-colors",
+                              "dropdown-item block px-4 py-2 text-l transition-colors",
                               isSubActive
-                                ? "bg-pink-50 dark:bg-pink-900/20 text-pink-600 dark:text-pink-400 font-medium"
+                                ? "dropdown-item-active bg-pink-50 dark:bg-pink-900/20 text-pink-600 dark:text-pink-400 font-medium"
                                 : "hover:bg-pink-50 dark:hover:bg-pink-900/20 hover:text-pink-600",
                             )}
                             onClick={() => setHoveredCategory(null)}
@@ -431,9 +434,9 @@ export default function Header() {
                             key={sub.slug}
                             href={`/products?subcategory=${sub.slug}`}
                             className={cn(
-                              "block px-4 py-2 text-l transition-colors",
+                              "dropdown-item block px-4 py-2 text-l transition-colors",
                               isSubActive
-                                ? "bg-pink-50 dark:bg-pink-900/20 text-pink-600 dark:text-pink-400 font-medium"
+                                ? "dropdown-item-active bg-pink-50 dark:bg-pink-900/20 text-pink-600 dark:text-pink-400 font-medium"
                                 : "hover:bg-pink-50 dark:hover:bg-pink-900/20 hover:text-pink-600",
                             )}
                             onClick={() => setHoveredCategory(null)}
@@ -460,7 +463,7 @@ export default function Header() {
               >
                 <button
                   className={cn(
-                    "flex items-center gap-1 text-l font-medium transition-colors py-2 px-3 rounded-lg",
+                    "nav-link flex items-center gap-1 text-l font-medium transition-colors py-2 px-3 rounded-lg",
                     "text-gray-700 dark:text-gray-300 hover:text-pink-600 dark:hover:text-pink-400 hover:bg-pink-50 dark:hover:bg-pink-900/20",
                   )}
                 >
@@ -489,9 +492,9 @@ export default function Header() {
                             key={cat.slug}
                             href={`/products?category=${cat.slug}`}
                             className={cn(
-                              "block px-4 py-2 text-l transition-colors",
+                              "dropdown-item block px-4 py-2 text-l transition-colors",
                               isActive
-                                ? "bg-pink-50 dark:bg-pink-900/20 text-pink-600 dark:text-pink-400 font-medium"
+                                ? "dropdown-item-active bg-pink-50 dark:bg-pink-900/20 text-pink-600 dark:text-pink-400 font-medium"
                                 : "hover:bg-pink-50 dark:hover:bg-pink-900/20 hover:text-pink-600",
                             )}
                             onClick={() => setShowMoreMenu(false)}
@@ -565,7 +568,7 @@ export default function Header() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="rounded-full relative hover:bg-pink-50 dark:hover:bg-pink-900/20 hover:text-pink-600 dark:hover:text-pink-400"
+                    className="header-icon-btn rounded-full relative hover:bg-pink-50 dark:hover:bg-pink-900/20 hover:text-pink-600 dark:hover:text-pink-400"
                   >
                     <Heart className="h-5 w-5" />
                   </Button>
@@ -576,7 +579,7 @@ export default function Header() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="hidden md:block rounded-full relative hover:bg-pink-50 dark:hover:bg-pink-900/20 hover:text-pink-600 dark:hover:text-pink-400"
+                className="header-icon-btn hidden md:block rounded-full relative hover:bg-pink-50 dark:hover:bg-pink-900/20 hover:text-pink-600 dark:hover:text-pink-400"
                 onClick={handleCartToggle}
               >
                 <ShoppingBag className="h-5 w-5" />
@@ -596,7 +599,7 @@ export default function Header() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="rounded-full relative hover:bg-pink-50 dark:hover:bg-pink-900/20 hover:text-pink-600 dark:hover:text-pink-400"
+                    className="header-icon-btn rounded-full relative hover:bg-pink-50 dark:hover:bg-pink-900/20 hover:text-pink-600 dark:hover:text-pink-400"
                   >
                     <User className="h-5 w-5" />
                     {user && (
@@ -615,14 +618,14 @@ export default function Header() {
                     <div className="p-2">
                       <Link
                         href="/profile"
-                        className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-pink-50 dark:hover:bg-pink-900/20 hover:text-pink-600 dark:hover:text-pink-400 text-sm"
+                        className="user-menu-item flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-pink-50 dark:hover:bg-pink-900/20 hover:text-pink-600 dark:hover:text-pink-400 text-sm"
                       >
                         <User className="h-4 w-4" />
                         Profile
                       </Link>
                       <Link
                         href="/orders"
-                        className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-pink-50 dark:hover:bg-pink-900/20 hover:text-pink-600 dark:hover:text-pink-400 text-sm"
+                        className="user-menu-item flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-pink-50 dark:hover:bg-pink-900/20 hover:text-pink-600 dark:hover:text-pink-400 text-sm"
                       >
                         <ShoppingBag className="h-4 w-4" />
                         Orders
@@ -630,7 +633,7 @@ export default function Header() {
                       {isAdmin && (
                         <Link
                           href="/admin"
-                          className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-pink-50 dark:hover:bg-pink-900/20 text-sm text-pink-600"
+                          className="user-menu-item flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-pink-50 dark:hover:bg-pink-900/20 text-sm text-pink-600"
                         >
                           <Settings className="h-4 w-4" />
                           Admin Panel
@@ -638,7 +641,7 @@ export default function Header() {
                       )}
                       <button
                         onClick={handleSignOut}
-                        className="flex items-center gap-2 w-full px-3 py-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-sm text-red-600"
+                        className="user-menu-item-danger flex items-center gap-2 w-full px-3 py-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-sm text-red-600"
                       >
                         <LogOut className="h-4 w-4" />
                         Logout
@@ -652,7 +655,7 @@ export default function Header() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="lg:hidden rounded-full hover:bg-pink-50 dark:hover:bg-pink-900/20 hover:text-pink-600 dark:hover:text-pink-400"
+                className="header-icon-btn lg:hidden rounded-full hover:bg-pink-50 dark:hover:bg-pink-900/20 hover:text-pink-600 dark:hover:text-pink-400"
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               >
                 {isMobileMenuOpen ? (

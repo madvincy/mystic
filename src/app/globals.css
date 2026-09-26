@@ -776,3 +776,84 @@ div[role="dialog"] {
 .overflow-y-auto::-webkit-scrollbar-thumb:hover {
   background: hsl(var(--mystic-pink) / 0.6) !important;
 }
+
+footer ul li a:hover,
+footer .border-t a:hover {
+  color: hsl(var(--mystic-pink)) !important;
+}
+
+/* ============================================
+   FIX: HEADER NAV HOVER/ACTIVE STATES
+   (diagnostic/patch — same Tailwind hover-utility
+   issue as the footer fix above)
+   ============================================ */
+
+.nav-link:hover {
+  color: hsl(var(--mystic-pink)) !important;
+  background-color: hsl(var(--mystic-pink-light)) !important;
+}
+
+.dark .nav-link:hover {
+  color: hsl(var(--mystic-pink)) !important;
+  background-color: hsl(var(--mystic-pink) / 0.2) !important;
+}
+
+.nav-link-active {
+  color: hsl(var(--mystic-pink)) !important;
+  background-color: hsl(var(--mystic-pink-light)) !important;
+}
+
+.dark .nav-link-active {
+  background-color: hsl(var(--mystic-pink) / 0.2) !important;
+}
+
+.nav-link.group:hover .nav-underline {
+  opacity: 1 !important;
+}
+
+.dropdown-item:hover {
+  background-color: hsl(var(--mystic-pink-light)) !important;
+  color: hsl(var(--mystic-pink)) !important;
+}
+
+.dark .dropdown-item:hover {
+  background-color: hsl(var(--mystic-pink) / 0.2) !important;
+  color: hsl(var(--mystic-pink)) !important;
+}
+
+.dropdown-item-active {
+  background-color: hsl(var(--mystic-pink-light)) !important;
+  color: hsl(var(--mystic-pink)) !important;
+}
+
+.dark .dropdown-item-active {
+  background-color: hsl(var(--mystic-pink) / 0.2) !important;
+}
+
+.header-icon-btn:hover {
+  background-color: hsl(var(--mystic-pink-light)) !important;
+  color: hsl(var(--mystic-pink)) !important;
+}
+
+.dark .header-icon-btn:hover {
+  background-color: hsl(var(--mystic-pink) / 0.2) !important;
+  color: hsl(var(--mystic-pink)) !important;
+}
+
+.user-menu-item:hover {
+  background-color: hsl(var(--mystic-pink-light)) !important;
+  color: hsl(var(--mystic-pink)) !important;
+}
+
+.dark .user-menu-item:hover {
+  background-color: hsl(var(--mystic-pink) / 0.2) !important;
+  color: hsl(var(--mystic-pink)) !important;
+}
+
+.user-menu-item-danger:hover {
+  background-color: hsl(0 84.2% 96%) !important;
+}
+
+.dark .user-menu-item-danger:hover {
+  background-color: hsl(0 62.8% 20%) !important;
+}
