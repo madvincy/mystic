@@ -1,5 +1,6 @@
 // src/app/layout.tsx
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { Syne } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "sonner";
@@ -56,7 +57,9 @@ export default function RootLayout({
               <ErrorBoundary>
                 {/* Age Verification - Always on top */}
                 <AgeVerification />
-                <Header />
+                <Suspense fallback={null}>
+                  <Header />
+                </Suspense>
                 <main className="min-h-screen pt-20">{children}</main>
                 <Footer />
                 <FloatingCartButton />

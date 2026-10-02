@@ -57,8 +57,6 @@ export default function AgeVerification({
   const [score, setScore] = useState(0)
   const [selectedMethod, setSelectedMethod] = useState<'date' | 'question'>('date')
   const [birthYear, setBirthYear] = useState('')
-  const [birthMonth, setBirthMonth] = useState('')
-  const [birthDay, setBirthDay] = useState('')
   const [error, setError] = useState('')
 
   // Refs
@@ -117,47 +115,30 @@ export default function AgeVerification({
   }, [])
 
   // ✅ Check legal age
-  const isLegalAge = useCallback((birthDate: Date): boolean => {
-    const today = new Date()
-    let age = today.getFullYear() - birthDate.getFullYear()
-    const monthDiff = today.getMonth() - birthDate.getMonth()
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-      age--
-    }
-    return age >= 18
+  const isLegalAge = useCallback((year: number): boolean => {
+    return new Date().getFullYear() - year >= 18
   }, [])
 
   // ✅ Verify age via date
   const verifyByDate = useCallback(() => {
-    if (!birthYear || !birthMonth || !birthDay) {
-      setError('Please enter your full birth date')
+    if (!birthYear) {
+      setError('Please select your birth year')
       return
     }
 
-    const year = parseInt(birthYear)
-    const month = parseInt(birthMonth) - 1
-    const day = parseInt(birthDay)
+    const year = Number(birthYear)
+    const currentYear = new Date().getFullYear()
     
-    if (isNaN(year) || isNaN(month) || isNaN(day)) {
-      setError('Please enter a valid date')
+    if (!Number.isInteger(year) || year < 1900 || year > currentYear) {
+      setError('Please select a valid birth year')
       return
     }
 
-    const birthDate = new Date(year, month, day)
-    
-    // Validate date
-    if (birthDate.getFullYear() !== year || 
-        birthDate.getMonth() !== month || 
-        birthDate.getDate() !== day) {
-      setError('Please enter a valid date')
-      return
-    }
-
-    if (isLegalAge(birthDate)) {
+    if (isLegalAge(year)) {
       // ✅ Verified
       const verificationData = {
         verified: true,
-        date: birthDate.toISOString(),
+        birthYear: year,
         method: 'date',
         timestamp: new Date().toISOString()
       }
@@ -177,7 +158,7 @@ export default function AgeVerification({
         setCurrentStep('denied')
       }
     }
-  }, [birthYear, birthMonth, birthDay, isLegalAge, attemptCount])
+  }, [birthYear, isLegalAge, attemptCount])
 
   // ✅ Verify via question
   const verifyByQuestion = useCallback((answer: 'yes' | 'no') => {
@@ -362,7 +343,7 @@ export default function AgeVerification({
                         >
                           <div className="flex items-center gap-3">
                             <Calendar className="h-5 w-5" />
-                            <span className="font-medium">Enter Birth Date</span>
+                            <span className="font-medium">Enter Birth Year</span>
                           </div>
                           <ChevronRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
                         </button>
@@ -407,59 +388,31 @@ export default function AgeVerification({
                       <div className="text-center">
                         <div className="inline-flex items-center gap-2 bg-blue-500/10 text-blue-400 px-3 py-1 rounded-full text-sm">
                           <Calendar className="h-4 w-4" />
-                          Enter Your Birth Date
+                          Enter Your Birth Year
                         </div>
                         <p className="mt-2 text-gray-400 text-sm">
-                          Please enter your date of birth to verify your age
+                          Select your birth year to confirm you are at least 18
                         </p>
                       </div>
 
-                      <div className="grid grid-cols-3 gap-2">
-                        <div>
-                          <label className="block text-xs text-gray-400 mb-1">Month</label>
-                          <select
-                            value={birthMonth}
-                            onChange={(e) => setBirthMonth(e.target.value)}
-                            className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-                          >
-                            <option value="">MM</option>
-                            {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
-                              <option key={m} value={m.toString().padStart(2, '0')}>
-                                {m.toString().padStart(2, '0')}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-xs text-gray-400 mb-1">Day</label>
-                          <select
-                            value={birthDay}
-                            onChange={(e) => setBirthDay(e.target.value)}
-                            className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-                          >
-                            <option value="">DD</option>
-                            {Array.from({ length: 31 }, (_, i) => i + 1).map(d => (
-                              <option key={d} value={d.toString().padStart(2, '0')}>
-                                {d.toString().padStart(2, '0')}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-xs text-gray-400 mb-1">Year</label>
-                          <select
-                            value={birthYear}
-                            onChange={(e) => setBirthYear(e.target.value)}
-                            className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-                          >
-                            <option value="">YYYY</option>
-                            {Array.from({ length: 100 }, (_, i) => new Date().getFullYear() - i).map(y => (
-                              <option key={y} value={y}>
-                                {y}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
+                      <div>
+                        <label htmlFor="birth-year" className="mb-1 block text-xs text-gray-400">Birth year</label>
+                        <select
+                          id="birth-year"
+                          value={birthYear}
+                          onChange={(e) => {
+                            setBirthYear(e.target.value)
+                            setError('')
+                          }}
+                          className="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-3 text-white focus:border-transparent focus:ring-2 focus:ring-pink-500"
+                        >
+                          <option value="">Select year</option>
+                          {Array.from({ length: new Date().getFullYear() - 1899 }, (_, i) => new Date().getFullYear() - i).map(year => (
+                            <option key={year} value={year}>
+                              {year}
+                            </option>
+                          ))}
+                        </select>
                       </div>
 
                       {error && (
@@ -637,8 +590,6 @@ export default function AgeVerification({
                           setAttemptCount(0)
                           setError('')
                           setBirthYear('')
-                          setBirthMonth('')
-                          setBirthDay('')
                         }}
                         className="mt-4 bg-pink-600 hover:bg-pink-700 text-white"
                       >
