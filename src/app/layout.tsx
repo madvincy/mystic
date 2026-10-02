@@ -14,19 +14,29 @@ import AgeVerification from "@/components/ui/AgeVerification";
 import FloatingCartButton from "@/components/ui/FloatingCartButton";
 
 const geist = Syne({ subsets: ["latin"] });
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://mysticwines.co.ke";
 
 export const metadata: Metadata = {
-  title: "Mystic Wines & Spirits",
-  description: "Discover our exquisite collection of premium wines & spirits",
+  metadataBase: new URL(siteUrl),
+  title: {
+    default: "Mystic Wines & Spirits | Premium Drinks in Kenya",
+    template: "%s | Mystic Wines & Spirits",
+  },
+  description: "Shop wines, spirits and premium drinks in Kenya from Mystic Wines & Spirits. Browse product details, current prices and delivery options.",
   keywords: "wines, spirits, premium drinks, mystic wines",
   authors: [{ name: "Mystic Wines" }],
   openGraph: {
-    title: "Mystic Wines & Spirits",
-    description: "Discover our exquisite collection of premium wines & spirits",
-    url: "https://mysticwines.co.ke",
-    siteName: "Mystic Wines",
+    title: "Mystic Wines & Spirits | Premium Drinks in Kenya",
+    description: "Shop wines, spirits and premium drinks in Kenya from Mystic Wines & Spirits.",
+    url: siteUrl,
+    siteName: "Mystic Wines & Spirits",
     locale: "en_KE",
     type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Mystic Wines & Spirits | Premium Drinks in Kenya",
+    description: "Shop wines, spirits and premium drinks in Kenya from Mystic Wines & Spirits.",
   },
   icons: {
     icon: [
