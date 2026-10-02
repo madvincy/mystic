@@ -32,17 +32,7 @@ export default function WishlistButton({
   const wishlistItems = useSelector((state: RootState) => state.wishlist.items)
   const wishlistError = useSelector((state: RootState) => state.wishlist.error)
 
-  // Check if product is in wishlist - handle null variantId
-  const inWishlist = wishlistItems.some(
-    w => {
-      // If variantId is null or undefined, match products without variant
-      if (!variantId) {
-        return w.product_id === productId && !w.variant_id
-      }
-      // Otherwise match both product and variant
-      return w.product_id === productId && w.variant_id === variantId
-    }
-  )
+  const inWishlist = wishlistItems.some(w => w.product_id === productId)
 
   // Update local state when wishlist changes
   useEffect(() => {

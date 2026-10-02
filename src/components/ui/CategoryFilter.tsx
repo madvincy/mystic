@@ -1,8 +1,8 @@
 // src/components/ui/CategoryFilter.tsx
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useSearchParams, useRouter, usePathname } from 'next/navigation'
+import { useState, useEffect, useMemo } from 'react'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { ChevronRight, ChevronDown, X, Wine, Beer, Martini, Zap, CupSoda, WineIcon, Shirt, GlassWater, PillBottle, Sparkles, ShoppingBasket, Beaker, Cigarette } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -17,7 +17,7 @@ interface Category {
   image_url?: string
   count?: number
   subcategories?: Category[]
-  parent_id?: string | null
+  category_id?: string | null
 }
 
 interface CategoryFilterProps {
@@ -49,38 +49,26 @@ export default function CategoryFilter({
   expanded = true
 }: CategoryFilterProps) {
   const router = useRouter()
-  const pathname = usePathname()
   const searchParams = useSearchParams()
   const [categories, setCategories] = useState<Category[]>([])
-  const [selectedSlug, setSelectedSlug] = useState<string | null>(null)
-  const [selectedParentSlug, setSelectedParentSlug] = useState<string | null>(null)
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
+  const selectedCategorySlug = searchParams?.get('category') || null
+  const selectedSubcategorySlug = searchParams?.get('subcategory') || null
+  const selectedParentSlug = useMemo(() => {
+    if (!selectedSubcategorySlug) return null
+    return categories.find(category =>
+      category.subcategories?.some(subcategory => subcategory.slug === selectedSubcategorySlug)
+    )?.slug || null
+  }, [categories, selectedSubcategorySlug])
+  const selectedSlug = selectedSubcategorySlug || selectedCategorySlug
 
-  // Get selected category from URL
+  // Keep the selected subcategory's parent open, including direct navbar links.
   useEffect(() => {
-    const categoryParam = searchParams?.get('category')
-    const subcategoryParam = searchParams?.get('subcategory')
-    
-    if (subcategoryParam) {
-      setSelectedSlug(subcategoryParam)
-      // Find parent category for this subcategory
-      const parent = categories.find(c => 
-        c.subcategories?.some(sub => sub.slug === subcategoryParam)
-      )
-      if (parent) {
-        setSelectedParentSlug(parent.slug)
-        // Auto-expand the parent category
-        setExpandedCategories(prev => new Set([...prev, parent.id]))
-      }
-    } else if (categoryParam) {
-      setSelectedSlug(categoryParam)
-      setSelectedParentSlug(null)
-    } else {
-      setSelectedSlug(null)
-      setSelectedParentSlug(null)
-    }
-  }, [searchParams, categories])
+    if (!selectedSubcategorySlug || !selectedParentSlug) return
+    const parent = categories.find(category => category.slug === selectedParentSlug)
+    if (parent) setExpandedCategories(previous => new Set(previous).add(parent.id))
+  }, [categories, selectedParentSlug, selectedSubcategorySlug])
 
   useEffect(() => {
     const fetchCategories = async () => {
@@ -95,11 +83,10 @@ export default function CategoryFilter({
 
         if (error) throw error
 
-        // Fetch all subcategories
+        // Subcategories are stored separately and linked through category_id.
         const { data: allSubcategories, error: subError } = await supabase
-          .from('categories')
+          .from('subcategories')
           .select('*')
-          .not('parent_id', 'is', null)
           .order('name')
 
         if (subError) throw subError
@@ -108,7 +95,7 @@ export default function CategoryFilter({
         const categoriesWithSubs = await Promise.all(
           (mainCategories || []).map(async (cat) => {
             const subcategories = (allSubcategories || [])
-              .filter(sub => sub.parent_id === cat.id)
+              .filter(sub => sub.category_id === cat.id)
               .map(sub => ({
                 ...sub,
                 count: 0 // Will be calculated below
@@ -126,7 +113,7 @@ export default function CategoryFilter({
                 const { count } = await supabase
                   .from('products')
                   .select('*', { count: 'exact', head: true })
-                  .eq('category_id', sub.id)
+                  .eq('subcategory_id', sub.id)
                 return { ...sub, count: count || 0 }
               })
             )
@@ -173,14 +160,16 @@ export default function CategoryFilter({
       params.delete('subcategory')
     }
     
-    router.push(`/products?${params.toString()}`)
+    const query = params.toString()
+    router.push(query ? `/products?${query}` : '/products', { scroll: false })
   }
 
   const clearFilter = () => {
     const params = new URLSearchParams(searchParams?.toString() || '')
     params.delete('category')
     params.delete('subcategory')
-    router.push(`/products?${params.toString()}`)
+    const query = params.toString()
+    router.replace(query ? `/products?${query}` : '/products', { scroll: false })
   }
 
   if (loading) {
@@ -226,7 +215,8 @@ export default function CategoryFilter({
               const params = new URLSearchParams(searchParams?.toString() || '')
               params.delete('category')
               params.delete('subcategory')
-              router.push(`/products?${params.toString()}`)
+              const query = params.toString()
+              router.replace(query ? `/products?${query}` : '/products', { scroll: false })
             }}
             className={cn(
               "w-full text-left px-3 py-2 rounded-lg transition-colors text-sm",

@@ -2,6 +2,15 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit'
 import { supabase } from '../supabase/client'
 
+const uniqueByProduct = (items: any[]) => {
+  const seen = new Set<string>()
+  return items.filter((item) => {
+    if (!item?.product_id || seen.has(item.product_id)) return false
+    seen.add(item.product_id)
+    return true
+  })
+}
+
 // ✅ Fetch wishlist - handles both authenticated and guest users
 export const fetchWishlist = createAsyncThunk(
   'wishlist/fetchWishlist',
@@ -34,8 +43,8 @@ export const fetchWishlist = createAsyncThunk(
         throw error
       }
       
-      // console.log('✅ Wishlist fetched:', data?.length || 0)
-      return data || []
+      // Keep one saved entry per product even if older variant rows were duplicated.
+      return uniqueByProduct(data || [])
     } catch (error: any) {
       return rejectWithValue(error.message)
     }
@@ -54,22 +63,14 @@ export const toggleWishlist = createAsyncThunk(
         return rejectWithValue('User not authenticated')
       }
 
-      // ✅ Build the query conditionally - don't include variant_id if it's null/undefined/empty
-      let query = supabase
+      // A wishlist entry represents a product, not a product/variant pair.
+      const { data: existing, error: checkError } = await supabase
         .from('wishlist')
         .select('id')
         .eq('user_id', userId)
         .eq('product_id', productId)
-
-      // ✅ Only add variant_id filter if it exists and is not empty
-      if (variantId && variantId.trim() !== '') {
-        query = query.eq('variant_id', variantId)
-      } else {
-        // If no variant ID, match where variant_id is null
-        query = query.is('variant_id', null)
-      }
-
-      const { data: existing, error: checkError } = await query.maybeSingle()
+        .limit(1)
+        .maybeSingle()
 
       if (checkError) {
         // console.error('❌ Check wishlist error:', checkError)
@@ -82,7 +83,8 @@ export const toggleWishlist = createAsyncThunk(
         const { error } = await supabase
           .from('wishlist')
           .delete()
-          .eq('id', existing.id)
+          .eq('user_id', userId)
+          .eq('product_id', productId)
         
         if (error) {
           // console.error('❌ Remove wishlist error:', error)
@@ -132,6 +134,23 @@ export const toggleWishlist = createAsyncThunk(
   }
 )
 
+export const removeWishlistProducts = createAsyncThunk(
+  'wishlist/removeProducts',
+  async ({ userId, productIds }: { userId: string; productIds: string[] }, { rejectWithValue }) => {
+    if (!userId) return rejectWithValue('User not authenticated')
+    if (productIds.length === 0) return []
+
+    const { error } = await supabase
+      .from('wishlist')
+      .delete()
+      .eq('user_id', userId)
+      .in('product_id', productIds)
+
+    if (error) return rejectWithValue(error.message)
+    return productIds
+  }
+)
+
 interface WishlistState {
   items: any[]
   loading: boolean
@@ -164,7 +183,7 @@ const wishlistSlice = createSlice({
       })
       .addCase(fetchWishlist.fulfilled, (state, action) => {
         state.loading = false
-        state.items = action.payload || []
+        state.items = uniqueByProduct(action.payload || [])
       })
       .addCase(fetchWishlist.rejected, (state, action) => {
         state.loading = false
@@ -178,20 +197,14 @@ const wishlistSlice = createSlice({
         const { productId, variantId, action: actionType, item } = action.payload
         
         if (actionType === 'added' && item) {
-          state.items.push(item)
+          state.items = uniqueByProduct([...state.items, item])
         } else if (actionType === 'removed') {
-          // ✅ Filter out the item regardless of variant
-          state.items = state.items.filter(
-            w => {
-              // If variantId is null, match products without variant
-              if (!variantId) {
-                return !(w.product_id === productId && w.variant_id === null)
-              }
-              // Otherwise match both product and variant
-              return !(w.product_id === productId && w.variant_id === variantId)
-            }
-          )
+          state.items = state.items.filter(w => w.product_id !== productId)
         }
+      })
+      .addCase(removeWishlistProducts.fulfilled, (state, action) => {
+        const removedProductIds = new Set(action.payload)
+        state.items = state.items.filter(item => !removedProductIds.has(item.product_id))
       })
       .addCase(toggleWishlist.rejected, (state, action) => {
         state.error = action.payload as string

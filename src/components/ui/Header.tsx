@@ -9,6 +9,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { RootState, AppDispatch } from "@/lib/store";
 import { setCartOpen } from "@/lib/store/uiSlice";
 import { loadCartFromCache } from "@/lib/store/cartSlice";
+import { clearWishlist, fetchWishlist } from "@/lib/store/wishlistSlice";
 import {
   Menu,
   X,
@@ -92,6 +93,7 @@ export default function Header() {
   const dispatch = useDispatch<AppDispatch>();
   const { theme } = useTheme();
   const { itemCount } = useSelector((state: RootState) => state.cart);
+  const wishlistCount = useSelector((state: RootState) => state.wishlist.items.length);
   const { isCartOpen } = useSelector((state: RootState) => state.ui);
 
   const { user, isAdmin, loading: authLoading, signOut } = useSupabaseAuth();
@@ -115,6 +117,14 @@ export default function Header() {
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, [dispatch]);
+
+  useEffect(() => {
+    if (user?.id) {
+      dispatch(fetchWishlist(user.id));
+    } else if (!authLoading) {
+      dispatch(clearWishlist());
+    }
+  }, [authLoading, dispatch, user?.id]);
 
   // ✅ Early return AFTER all hooks have been called
   if (pathname?.startsWith("/admin")) {
@@ -570,9 +580,15 @@ export default function Header() {
                   <Button
                     variant="ghost"
                     size="icon"
+                    aria-label={`Wishlist${wishlistCount ? `, ${wishlistCount} saved` : ''}`}
                     className="header-icon-btn rounded-full relative hover:bg-pink-50 dark:hover:bg-pink-900/20 hover:text-pink-600 dark:hover:text-pink-400"
                   >
                     <Heart className="h-5 w-5" />
+                    {wishlistCount > 0 && (
+                      <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 bg-pink-600 text-white text-[10px] rounded-full flex items-center justify-center">
+                        {wishlistCount > 99 ? '99+' : wishlistCount}
+                      </span>
+                    )}
                   </Button>
                 </Link>
               </div>

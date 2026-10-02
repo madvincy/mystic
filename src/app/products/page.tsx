@@ -19,12 +19,14 @@ import { Button } from '@/components/shadCn/ui/button'
 import { Filter, X, RefreshCw, CloudOff, Cloud } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
+import { useAuth } from '@/lib/hooks/useAuth'
 
 export default function ProductsPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const dispatch = useDispatch<AppDispatch>()
   const { products, loading } = useSelector((state: RootState) => state.products)
+  const { isAdmin } = useAuth()
   
   const { isSyncing, progress, total, error, metrics, sync } = useProductSync()
   
@@ -34,8 +36,6 @@ export default function ProductsPage() {
   // ✅ Fix: Initialize isOnline as true on client, false on server
   const [isOnline, setIsOnline] = useState(true) // Default to true for client
   const [isMounted, setIsMounted] = useState(false) // Track mount state
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
-  const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(null)
   const [showSyncStatus, setShowSyncStatus] = useState(false)
   
   const [activeFilters, setActiveFilters] = useState({
@@ -195,8 +195,6 @@ export default function ProductsPage() {
       sort: sort || null,
     })
 
-    setSelectedCategory(category || null)
-    setSelectedSubcategory(subcategory || null)
   }, [searchParams])
 
   // ✅ Filter and sort products - memoized for performance
@@ -305,11 +303,12 @@ export default function ProductsPage() {
   const removeFilter = (key: string) => {
     const params = new URLSearchParams(searchParams?.toString() || '')
     params.delete(key)
-    router.push(`/products?${params.toString()}`)
+    const query = params.toString()
+    router.replace(query ? `/products?${query}` : '/products', { scroll: false })
   }
 
   const clearAllFilters = () => {
-    router.push('/products')
+    router.replace('/products', { scroll: false })
   }
 
   // ✅ Don't render until mounted to prevent hydration mismatch
@@ -326,14 +325,16 @@ export default function ProductsPage() {
   return (
     <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
       {/* Sync Status */}
-      <SyncStatus
-        isSyncing={isSyncing || showSyncStatus}
-        progress={progress}
-        total={total}
-        error={error}
-        metrics={metrics}
-        onRetry={sync}
-      />
+      {isAdmin && (
+        <SyncStatus
+          isSyncing={isSyncing || showSyncStatus}
+          progress={progress}
+          total={total}
+          error={error}
+          metrics={metrics}
+          onRetry={sync}
+        />
+      )}
 
       {/* Network Status Bar - only shows when mounted */}
       {isMounted && (
@@ -351,7 +352,7 @@ export default function ProductsPage() {
                 {isOnline ? 'Online' : 'Offline - Showing cached products'}
               </span>
             </div>
-            {!isOnline && (
+            {isAdmin && !isOnline && (
               <Button
                 variant="ghost"
                 size="sm"
@@ -389,7 +390,7 @@ export default function ProductsPage() {
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <Button
+              {isAdmin && <Button
                 variant="outline"
                 size="sm"
                 onClick={handleSync}
@@ -402,7 +403,7 @@ export default function ProductsPage() {
                 {isSyncing && (
                   <span className="absolute -top-1 -right-1 h-2 w-2 bg-pink-600 rounded-full animate-pulse" />
                 )}
-              </Button>
+              </Button>}
               
               <Button
                 variant="outline"
