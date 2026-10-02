@@ -24,6 +24,7 @@ import {
   Clock
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
+import Link from 'next/link'
 import { toast } from 'sonner'
 import { Button } from '@/components/shadCn/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/shadCn/ui/card'
@@ -686,7 +687,7 @@ export default function AnalyticsDashboard() {
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: index * 0.1 }}
-                  className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-lg"
+                  className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900"
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-lg overflow-hidden bg-gray-200 dark:bg-gray-700">
@@ -723,15 +724,13 @@ export default function AnalyticsDashboard() {
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
             Recent Orders
-            <Button variant="ghost" size="sm" className="text-pink-600">
-              View All Orders
-            </Button>
+            <Link href="/admin/orders"><Button variant="ghost" size="sm" className="text-pink-600">View All Orders</Button></Link>
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
             {analytics.recent_orders.slice(0, 5).map((order: any) => (
-              <div key={order.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
+              <Link key={order.id} href={`/admin/orders/${order.id}`} className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 p-3 transition-colors hover:border-pink-300 hover:bg-pink-50/50 dark:border-gray-700 dark:bg-gray-900 dark:hover:border-pink-800 dark:hover:bg-pink-950/20">
                 <div>
                   <p className="font-medium">#{order.order_number}</p>
                   <p className="text-sm text-gray-500">
@@ -750,7 +749,7 @@ export default function AnalyticsDashboard() {
                     {order.status}
                   </span>
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         </CardContent>

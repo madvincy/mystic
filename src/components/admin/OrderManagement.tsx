@@ -30,12 +30,8 @@ import { Input } from '@/components/shadCn/ui/input'
 import { Badge } from '@/components/shadCn/ui/badge'
 import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/shadCn/ui/dialog'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -106,14 +102,13 @@ interface OrderItem {
 }
 
 export default function OrderManagement() {
+  const router = useRouter()
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [filterStatus, setFilterStatus] = useState('all')
   const [filterPayment, setFilterPayment] = useState('all')
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
-  const [showOrderDetails, setShowOrderDetails] = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [orderToDelete, setOrderToDelete] = useState<string | null>(null)
   const [isExporting, setIsExporting] = useState(false)
@@ -395,7 +390,7 @@ export default function OrderManagement() {
                     return (
                       <motion.tr key={order.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors">
                         <td className="px-6 py-4">
-                          <p className="font-medium text-pink-600 dark:text-pink-400">#{order.order_number}</p>
+                          <Link href={`/admin/orders/${order.id}`} className="font-medium text-pink-600 hover:underline dark:text-pink-400">#{order.order_number}</Link>
                           <p className="text-xs text-gray-500">{order.items?.length || 0} items</p>
                         </td>
                         <td className="px-6 py-4">
@@ -429,7 +424,7 @@ export default function OrderManagement() {
                             <DropdownMenuContent align="end">
                               <DropdownMenuLabel>Actions</DropdownMenuLabel>
                               <DropdownMenuSeparator />
-                              <DropdownMenuItem onClick={() => { setSelectedOrder(order); setShowOrderDetails(true); }}>
+                              <DropdownMenuItem onClick={() => router.push(`/admin/orders/${order.id}`)}>
                                 <Eye className="h-4 w-4 mr-2" /> View Details
                               </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => updateOrderStatus(order.id, 'processing')}>
@@ -498,7 +493,7 @@ export default function OrderManagement() {
                     <p className="text-xs text-gray-500">{order.items?.length || 0} items</p>
                   </div>
                   <div className="flex gap-2">
-                    <Button size="sm" variant="outline" onClick={() => { setSelectedOrder(order); setShowOrderDetails(true); }}>
+                    <Button size="sm" variant="outline" onClick={() => router.push(`/admin/orders/${order.id}`)}>
                       <Eye className="h-3 w-3 mr-1" /> View
                     </Button>
                   </div>
@@ -512,57 +507,6 @@ export default function OrderManagement() {
           )}
         </div>
       )}
-
-      {/* Order Details Dialog */}
-      <Dialog open={showOrderDetails} onOpenChange={setShowOrderDetails}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Order #{selectedOrder?.order_number}</DialogTitle>
-          </DialogHeader>
-          {selectedOrder && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-lg">
-                  <p className="text-sm text-gray-500">Customer</p>
-                  <p className="font-medium">{selectedOrder.user?.name || 'Guest'}</p>
-                  <p className="text-sm">{selectedOrder.user?.email}</p>
-                  <p className="text-sm">{selectedOrder.user?.phone}</p>
-                </div>
-                <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-lg">
-                  <p className="text-sm text-gray-500">Shipping</p>
-                  <p className="text-sm">{selectedOrder.shipping_address?.address}</p>
-                  <p className="text-sm">{selectedOrder.shipping_address?.city}</p>
-                </div>
-                <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-lg">
-                  <p className="text-sm text-gray-500">Payment</p>
-                  <p className="font-medium capitalize">{selectedOrder.payment_method}</p>
-                  <Badge className={selectedOrder.payment_status === 'paid' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}>
-                    {selectedOrder.payment_status}
-                  </Badge>
-                </div>
-              </div>
-              <div>
-                <h4 className="font-medium mb-2">Items</h4>
-                {selectedOrder.items?.map((item) => (
-                  <div key={item.id} className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-900 rounded mb-2">
-                    <div>
-                      <p className="font-medium">{item.product?.name}</p>
-                      <p className="text-sm text-gray-500">Qty: {item.quantity}</p>
-                    </div>
-                    <span className="font-medium">KSh {(item.price * item.quantity).toLocaleString()}</span>
-                  </div>
-                ))}
-              </div>
-              <div className="border-t pt-4">
-                <div className="flex justify-between text-lg font-bold">
-                  <span>Total</span>
-                  <span className="text-pink-600">KSh {selectedOrder.total_amount.toLocaleString()}</span>
-                </div>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
 
       {/* Delete Confirmation */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>

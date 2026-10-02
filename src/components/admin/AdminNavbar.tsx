@@ -12,6 +12,7 @@ import { useAuth } from '@/lib/hooks/useAuth'
 import { supabase } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { getAdminNotificationLink } from '@/lib/utils/admin-notification-link'
 
 interface AdminNavbarProps {
   sidebarOpen: boolean
@@ -28,6 +29,9 @@ interface Notification {
   created_at: string
   action_url: string | null
   action_label: string | null
+  related_id?: string | null
+  related_type?: string | null
+  metadata?: Record<string, unknown> | null
 }
 
 export default function AdminNavbar({ sidebarOpen, setSidebarOpen }: AdminNavbarProps) {
@@ -292,8 +296,9 @@ export default function AdminNavbar({ sidebarOpen, setSidebarOpen }: AdminNavbar
                             if (!notification.is_read) {
                               markAsRead(notification.id)
                             }
-                            if (notification.action_url) {
-                              router.push(notification.action_url)
+                            const destination = getAdminNotificationLink(notification)
+                            if (destination) {
+                              router.push(destination)
                               setShowNotifications(false)
                             }
                           }}

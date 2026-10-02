@@ -12,6 +12,7 @@ import Header from "@/components/ui/Header";
 import Footer from "@/components/ui/Footer";
 import AgeVerification from "@/components/ui/AgeVerification";
 import FloatingCartButton from "@/components/ui/FloatingCartButton";
+import CookieConsent from "@/components/ui/CookieConsent";
 
 const geist = Syne({ subsets: ["latin"] });
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://mysticwines.co.ke";
@@ -73,6 +74,7 @@ export default function RootLayout({
                 <main className="min-h-screen pt-20">{children}</main>
                 <Footer />
                 <FloatingCartButton />
+                <CookieConsent />
                 <Toaster
                   position="top-right"
                   richColors

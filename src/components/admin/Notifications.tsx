@@ -56,6 +56,7 @@ import {
 import { Label } from '@/components/shadCn/ui/label'
 import { Textarea } from '@/components/shadCn/ui/textarea'
 import Link from 'next/link'
+import { getAdminNotificationLink } from '@/lib/utils/admin-notification-link'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -662,9 +663,9 @@ export default function Notifications() {
                       </div>
                       <h3 className="font-medium mt-1 text-sm sm:text-base break-words">{notification.title}</h3>
                       <p className="text-xs sm:text-sm text-gray-500 mt-1 break-words">{notification.message}</p>
-                      {notification.action_url && (
+                      {getAdminNotificationLink(notification) && (
                         <Link
-                          href={notification.action_url}
+                          href={getAdminNotificationLink(notification)!}
                           className="text-xs sm:text-sm text-pink-600 hover:text-pink-700 mt-1 sm:mt-2 inline-block"
                         >
                           {notification.action_label || 'View Details'} →
