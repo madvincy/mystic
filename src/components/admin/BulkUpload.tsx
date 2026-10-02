@@ -444,7 +444,7 @@ export default function BulkUpload() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
                     <div className="text-center p-3 bg-gray-50 dark:bg-gray-900 rounded">
                       <p className="text-2xl font-bold">{result.total || 0}</p>
                       <p className="text-sm text-gray-500">Total</p>

@@ -355,7 +355,7 @@ export default function FlashSalesManagement() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {loading ? (
           [...Array(6)].map((_, i) => (
-            <Card key={i} className="animate-pulse">
+              <Card key={i} className="animate-pulse border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
               <CardContent className="p-4">
                 <div className="h-20 bg-gray-200 dark:bg-gray-700 rounded-lg mb-3" />
                 <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4 mb-2" />
@@ -374,7 +374,7 @@ export default function FlashSalesManagement() {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
             >
-              <Card>
+              <Card className="border border-gray-200 bg-white text-gray-900 shadow-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100">
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-2">
@@ -385,10 +385,10 @@ export default function FlashSalesManagement() {
                       {flashSale.is_active ? 'Active' : 'Inactive'}
                     </Badge>
                   </div>
-                  <p className="text-sm text-gray-500 mt-1 line-clamp-2">
+                  <p className="text-sm text-gray-600 dark:text-gray-300 mt-1 line-clamp-2">
                     {flashSale.description}
                   </p>
-                  <div className="flex items-center gap-4 mt-3 text-sm text-gray-500">
+                  <div className="flex items-center gap-4 mt-3 text-sm text-gray-600 dark:text-gray-300">
                     <span className="flex items-center gap-1">
                       <Calendar className="h-3 w-3" />
                       {new Date(flashSale.start_time).toLocaleDateString()}
@@ -399,7 +399,7 @@ export default function FlashSalesManagement() {
                       {new Date(flashSale.end_time).toLocaleDateString()}
                     </span>
                   </div>
-                  <div className="mt-2 text-sm text-gray-500">
+                  <div className="mt-2 text-sm text-gray-600 dark:text-gray-300">
                     {flashSale.products?.length || 0} products
                   </div>
                   <div className="flex gap-2 mt-3">
@@ -543,7 +543,7 @@ export default function FlashSalesManagement() {
                       initial={{ opacity: 0, y: -10 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -10 }}
-                      className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-48 overflow-y-auto"
+                      className="absolute z-10 w-full mt-1 bg-white text-gray-900 dark:bg-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-48 overflow-y-auto"
                     >
                       {searchResults.map((product) => (
                         <button
@@ -560,7 +560,7 @@ export default function FlashSalesManagement() {
                           </div>
                           <div>
                             <p className="font-medium">{product.name}</p>
-                            <p className="text-sm text-gray-500">KSh {product.price.toLocaleString()}</p>
+                            <p className="text-sm text-gray-600 dark:text-gray-300">KSh {product.price.toLocaleString()}</p>
                           </div>
                         </button>
                       ))}
@@ -569,7 +569,7 @@ export default function FlashSalesManagement() {
                 </AnimatePresence>
 
                 {showDropdown && productSearch.length >= 3 && searchResults.length === 0 && !isSearching && (
-                  <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-4 text-center text-gray-500">
+                  <div className="absolute z-10 w-full mt-1 bg-white text-gray-600 dark:bg-gray-900 dark:text-gray-300 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-4 text-center">
                     No products found
                   </div>
                 )}

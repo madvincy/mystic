@@ -329,21 +329,21 @@ export default function OrderManagement() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col md:flex-row gap-4">
-        <div className="flex-1 relative">
+      <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-6">
+        <div className="relative min-w-0 sm:col-span-2 xl:col-span-2">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input placeholder="Search orders..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10" />
         </div>
-        <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+        <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="min-w-0 w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
           {statusOptions.map(s => (<option key={s.value} value={s.value}>{s.label}</option>))}
         </select>
-        <select value={filterPayment} onChange={(e) => setFilterPayment(e.target.value)} className="px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+        <select value={filterPayment} onChange={(e) => setFilterPayment(e.target.value)} className="min-w-0 w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
           <option value="all">All Payments</option>
           <option value="mpesa">M-Pesa</option>
           <option value="cash">Cash</option>
           <option value="card">Card</option>
         </select>
-        <select value={dateRange} onChange={(e) => { setDateRange(e.target.value); if (e.target.value !== 'custom') fetchOrders(); }} className="px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+        <select value={dateRange} onChange={(e) => { setDateRange(e.target.value); if (e.target.value !== 'custom') fetchOrders(); }} className="min-w-0 w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
           <option value="all">All Time</option>
           <option value="today">Today</option>
           <option value="week">Last 7 Days</option>
@@ -351,13 +351,13 @@ export default function OrderManagement() {
           <option value="custom">Custom Range</option>
         </select>
         {dateRange === 'custom' && (
-          <div className="flex gap-2">
-            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800" />
-            <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800" />
+          <div className="flex min-w-0 flex-col gap-2 sm:col-span-2 sm:flex-row xl:col-span-3">
+            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="min-w-0 w-full flex-1 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800" />
+            <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="min-w-0 w-full flex-1 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800" />
             <Button size="sm" onClick={() => { if (startDate && endDate) fetchOrders(); }}>Apply</Button>
           </div>
         )}
-        <div className="flex gap-1">
+        <div className="flex gap-1 sm:col-span-2 xl:col-span-1">
           <Button variant={viewMode === 'table' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('table')} className={viewMode === 'table' ? 'bg-pink-600' : ''}>
             <List className="h-4 w-4" />
           </Button>

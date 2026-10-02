@@ -103,6 +103,7 @@ export default function UserManagement() {
   const [showUserDetails, setShowUserDetails] = useState(false)
   const [showEditDialog, setShowEditDialog] = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false)
   const [userToDelete, setUserToDelete] = useState<string | null>(null)
   const [isExporting, setIsExporting] = useState(false)
   const [isImporting, setIsImporting] = useState(false)
@@ -555,7 +556,7 @@ export default function UserManagement() {
           <Button 
             size="sm" 
             variant="destructive"
-            onClick={bulkDelete}
+            onClick={() => setShowBulkDeleteDialog(true)}
           >
             <Trash2 className="h-4 w-4 mr-1" />
             Delete Selected
@@ -1106,6 +1107,23 @@ export default function UserManagement() {
               className="bg-red-600 hover:bg-red-700"
             >
               Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={showBulkDeleteDialog} onOpenChange={setShowBulkDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {selectedUsers.length} selected users?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. These user accounts will be permanently deleted.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={bulkDelete} className="bg-red-600 hover:bg-red-700">
+              Delete {selectedUsers.length} users
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

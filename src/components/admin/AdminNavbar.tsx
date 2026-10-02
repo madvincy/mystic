@@ -246,7 +246,7 @@ export default function AdminNavbar({ sidebarOpen, setSidebarOpen }: AdminNavbar
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: 10 }}
-                  className="absolute right-0 mt-2 w-96 bg-white dark:bg-gray-900 rounded-lg shadow-lg border border-gray-200 dark:border-gray-800 overflow-hidden z-50"
+                  className="absolute right-0 mt-2 w-[calc(100vw-2rem)] max-w-96 bg-white dark:bg-gray-900 rounded-lg shadow-lg border border-gray-200 dark:border-gray-800 overflow-hidden z-50 sm:w-96"
                 >
                   <div className="p-4 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
                     <h4 className="font-semibold">Notifications</h4>
@@ -360,7 +360,7 @@ export default function AdminNavbar({ sidebarOpen, setSidebarOpen }: AdminNavbar
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: 10 }}
-                  className="absolute right-0 mt-2 w-64 bg-white dark:bg-gray-900 rounded-lg shadow-lg border border-gray-200 dark:border-gray-800 overflow-hidden z-50"
+                  className="absolute right-0 mt-2 w-[calc(100vw-2rem)] max-w-64 bg-white dark:bg-gray-900 rounded-lg shadow-lg border border-gray-200 dark:border-gray-800 overflow-hidden z-50 sm:w-64"
                 >
                   <div className="p-4 border-b border-gray-200 dark:border-gray-800">
                     <p className="font-semibold">{user?.user_metadata?.name || 'Admin'}</p>

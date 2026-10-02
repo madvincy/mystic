@@ -122,6 +122,7 @@ export default function CheckoutPage() {
   const paymentCheckInterval = useRef<NodeJS.Timeout | null>(null);
   const searchTimeout = useRef<NodeJS.Timeout | null>(null);
   const paymentTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const submissionLock = useRef(false);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -865,6 +866,8 @@ export default function CheckoutPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (submissionLock.current) return;
+
     if (
       !formData.name ||
       !formData.email ||
@@ -882,6 +885,7 @@ export default function CheckoutPage() {
       }
     }
 
+    submissionLock.current = true;
     setIsLoading(true);
     setPaymentStatus({ status: "processing", message: "Creating order..." });
 
@@ -924,6 +928,7 @@ export default function CheckoutPage() {
       });
       toast.error(error.message || "Failed to place order");
     } finally {
+      submissionLock.current = false;
       setIsLoading(false);
     }
   };

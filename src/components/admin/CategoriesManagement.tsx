@@ -601,7 +601,7 @@ export default function CategoriesManagement() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {loading ? (
               [...Array(6)].map((_, i) => (
-                <Card key={i} className="animate-pulse">
+                <Card key={i} className="animate-pulse border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
                   <CardContent className="p-4">
                     <div className="h-32 bg-gray-200 dark:bg-gray-700 rounded-lg mb-3" />
                     <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4 mb-2" />
@@ -620,7 +620,7 @@ export default function CategoriesManagement() {
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
                 >
-                  <Card>
+                  <Card className="border border-gray-200 bg-white text-gray-900 shadow-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100">
                     <CardContent className="p-4">
                       <div className="relative h-32 bg-gray-100 dark:bg-gray-700 rounded-lg overflow-hidden mb-3">
                         {category.image_url ? (
@@ -637,16 +637,16 @@ export default function CategoriesManagement() {
                             <FolderTree className="h-12 w-12 text-gray-400" />
                           </div>
                         )}
-                        <Badge className="absolute top-2 right-2 bg-black/50">
+                        <Badge className="absolute top-2 right-2 bg-black/60 text-white">
                           {category.product_count || 0} products
                         </Badge>
                       </div>
                       <div>
                         <h3 className="font-medium">{category.name}</h3>
-                        <p className="text-sm text-gray-500 line-clamp-2">
+                        <p className="text-sm text-gray-600 dark:text-gray-300 line-clamp-2">
                           {category.description || 'No description'}
                         </p>
-                        <p className="text-xs text-gray-400 mt-1">
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                           Slug: {category.slug}
                         </p>
                       </div>
@@ -667,7 +667,9 @@ export default function CategoriesManagement() {
                         <Button
                           variant="destructive"
                           size="sm"
-                          className="flex-1"
+                          className="flex-1 bg-red-600 text-white hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-600"
+                          aria-label={`Delete category ${category.name}`}
+                          title={`Delete ${category.name}`}
                           onClick={() => {
                             setCategoryToDelete(category.id)
                             setShowCategoryDeleteDialog(true)
@@ -689,7 +691,7 @@ export default function CategoriesManagement() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {loading ? (
               [...Array(6)].map((_, i) => (
-                <Card key={i} className="animate-pulse">
+                <Card key={i} className="animate-pulse border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
                   <CardContent className="p-4">
                     <div className="h-32 bg-gray-200 dark:bg-gray-700 rounded-lg mb-3" />
                     <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4 mb-2" />
@@ -708,7 +710,7 @@ export default function CategoriesManagement() {
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
                 >
-                  <Card>
+                  <Card className="border border-gray-200 bg-white text-gray-900 shadow-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100">
                     <CardContent className="p-4">
                       <div className="relative h-32 bg-gray-100 dark:bg-gray-700 rounded-lg overflow-hidden mb-3">
                         {subcategory.image_url ? (
@@ -725,7 +727,7 @@ export default function CategoriesManagement() {
                             <Layers className="h-12 w-12 text-gray-400" />
                           </div>
                         )}
-                        <Badge className="absolute top-2 right-2 bg-black/50">
+                        <Badge className="absolute top-2 right-2 bg-black/60 text-white">
                           {subcategory.product_count || 0} products
                         </Badge>
                         <Badge className="absolute top-2 left-2 bg-purple-600 text-xs">
@@ -734,10 +736,10 @@ export default function CategoriesManagement() {
                       </div>
                       <div>
                         <h3 className="font-medium">{subcategory.name}</h3>
-                        <p className="text-sm text-gray-500 line-clamp-2">
+                        <p className="text-sm text-gray-600 dark:text-gray-300 line-clamp-2">
                           {subcategory.description || 'No description'}
                         </p>
-                        <p className="text-xs text-gray-400 mt-1">
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                           Slug: {subcategory.slug}
                         </p>
                       </div>
@@ -758,7 +760,9 @@ export default function CategoriesManagement() {
                         <Button
                           variant="destructive"
                           size="sm"
-                          className="flex-1"
+                          className="flex-1 bg-red-600 text-white hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-600"
+                          aria-label={`Delete subcategory ${subcategory.name}`}
+                          title={`Delete ${subcategory.name}`}
                           onClick={() => {
                             setSubcategoryToDelete(subcategory.id)
                             setShowSubcategoryDeleteDialog(true)
@@ -1089,9 +1093,11 @@ export default function CategoriesManagement() {
       <AlertDialog open={showCategoryDeleteDialog} onOpenChange={setShowCategoryDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogTitle>
+              Delete {categories.find((category) => category.id === categoryToDelete)?.name || 'this category'}?
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete this category and all associated subcategories and products.
+              This action cannot be undone. Deleting this category may also remove its associated subcategories and products.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1107,9 +1113,11 @@ export default function CategoriesManagement() {
       <AlertDialog open={showSubcategoryDeleteDialog} onOpenChange={setShowSubcategoryDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogTitle>
+              Delete {subcategories.find((subcategory) => subcategory.id === subcategoryToDelete)?.name || 'this subcategory'}?
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete this subcategory and all associated products.
+              This action cannot be undone. Products assigned to this subcategory may also be affected.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

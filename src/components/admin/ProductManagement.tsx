@@ -482,8 +482,8 @@ export default function ProductManagement() {
         ))}
       </div>
       {/* Filters */}
-      <div className="flex flex-col md:flex-row gap-4">
-        <div className="flex-1 relative">
+      <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-6">
+        <div className="relative min-w-0 sm:col-span-2 xl:col-span-2">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input
             placeholder="Search products..."
@@ -495,7 +495,7 @@ export default function ProductManagement() {
         <select
           value={filterCategory}
           onChange={(e) => setFilterCategory(e.target.value)}
-          className="px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
+          className="min-w-0 w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
         >
           <option value="all">All Categories</option>
           {categories.map((cat) => (
@@ -507,7 +507,7 @@ export default function ProductManagement() {
         <select
           value={filterStatus}
           onChange={(e) => setFilterStatus(e.target.value)}
-          className="px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
+          className="min-w-0 w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
         >
           <option value="all">All Status</option>
           <option value="in_stock">In Stock</option>
@@ -517,14 +517,14 @@ export default function ProductManagement() {
         <select
           value={filterFeatured}
           onChange={(e) => setFilterFeatured(e.target.value)}
-          className="px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
+          className="min-w-0 w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
         >
           <option value="all">All</option>
           <option value="featured">Featured</option>
           <option value="bestseller">Best Sellers</option>
           <option value="new">New Arrivals</option>
         </select>
-        <div className="flex gap-1">
+        <div className="flex gap-1 sm:col-span-2 xl:col-span-1">
           <Button
             variant={viewMode === "table" ? "default" : "outline"}
             size="sm"

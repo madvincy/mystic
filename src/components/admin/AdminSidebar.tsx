@@ -43,7 +43,7 @@ interface NavItem {
 }
 
 // ✅ Memoize the sidebar to prevent re-renders
-const AdminSidebar = memo(function AdminSidebar() {
+const AdminSidebar = memo(function AdminSidebar({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const router = useRouter();
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
@@ -293,7 +293,7 @@ const AdminSidebar = memo(function AdminSidebar() {
   };
 
   return (
-    <aside className="h-full w-64 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 overflow-y-auto">
+    <aside className="h-full w-64 overflow-y-auto border-r border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
       <div className="flex flex-col h-full">
         {/* Logo */}
         {/* <div className="flex items-center gap-2 px-4 py-4 border-b border-gray-200 dark:border-gray-800">
@@ -315,6 +315,7 @@ const AdminSidebar = memo(function AdminSidebar() {
                   key={item.title}
                   href={item.href}
                   prefetch={true}
+                  onClick={onNavigate}
                   className={cn(
                     "flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
                     isActive

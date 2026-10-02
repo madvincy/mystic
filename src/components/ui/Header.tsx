@@ -4,7 +4,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useDispatch, useSelector } from "react-redux";
 import { RootState, AppDispatch } from "@/lib/store";
 import { setCartOpen } from "@/lib/store/uiSlice";
@@ -87,6 +87,7 @@ const otherCategories = [
 export default function Header() {
   // ✅ ALL HOOKS AT THE TOP
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const router = useRouter();
   const dispatch = useDispatch<AppDispatch>();
   const { theme } = useTheme();
@@ -101,6 +102,7 @@ export default function Header() {
   const [mounted, setMounted] = useState(false);
   const [hoveredCategory, setHoveredCategory] = useState<string | null>(null);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
 
   // ✅ useEffect for mounting and scroll
   useEffect(() => {
@@ -192,8 +194,8 @@ export default function Header() {
     return slugs.some(
       (slug) =>
         pathname?.includes(`/products/${slug}`) ||
-        pathname?.includes(`?subcategory=${slug}`) ||
-        pathname?.includes(`?category=${slug}`),
+        searchParams.get("subcategory") === slug ||
+        searchParams.get("category") === slug,
     );
   };
 
@@ -595,20 +597,26 @@ export default function Header() {
               </Button>
               {/* ✅ User - Hidden on mobile (already in mobile menu) */}
               <div className="hidden md:block relative group">
-                <Link href={user ? "/profile" : "/auth/login"}>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="header-icon-btn rounded-full relative hover:bg-pink-50 dark:hover:bg-pink-900/20 hover:text-pink-600 dark:hover:text-pink-400"
-                  >
-                    <User className="h-5 w-5" />
-                    {user && (
-                      <span className="absolute -bottom-1 -right-1 h-3 w-3 bg-green-500 rounded-full border-2 border-white dark:border-gray-900" />
-                    )}
-                  </Button>
-                </Link>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  aria-label={user ? "Open account menu" : "Sign in"}
+                  aria-expanded={Boolean(user && showUserMenu)}
+                  aria-haspopup={user ? "menu" : undefined}
+                  className="header-icon-btn rounded-full relative hover:bg-pink-50 dark:hover:bg-pink-900/20 hover:text-pink-600 dark:hover:text-pink-400"
+                  onClick={() => user ? setShowUserMenu((open) => !open) : router.push("/auth/login")}
+                >
+                  <User className="h-5 w-5" />
+                  {user && (
+                    <span className="absolute -bottom-1 -right-1 h-3 w-3 bg-green-500 rounded-full border-2 border-white dark:border-gray-900" />
+                  )}
+                </Button>
                 {user && (
-                  <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-900 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                  <div
+                    role="menu"
+                    className={`absolute right-0 mt-2 w-56 bg-white dark:bg-gray-900 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 transition-all z-50 ${showUserMenu ? "opacity-100 visible" : "opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible"}`}
+                  >
                     <div className="p-3 border-b border-gray-200 dark:border-gray-700">
                       <p className="font-medium text-sm">
                         {user.user_metadata?.name || user.email}
@@ -641,6 +649,7 @@ export default function Header() {
                       )}
                       <button
                         onClick={handleSignOut}
+                        role="menuitem"
                         className="user-menu-item-danger flex items-center gap-2 w-full px-3 py-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-sm text-red-600"
                       >
                         <LogOut className="h-4 w-4" />
