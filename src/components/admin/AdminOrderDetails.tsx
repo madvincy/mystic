@@ -46,7 +46,7 @@ interface OrderRecord {
     variant_id?: string | null
     quantity: number
     price: number
-    product?: { name?: string; images?: string[]; sku?: string } | null
+    product?: { name?: string; images?: string[] } | null
     variant?: { variant_type?: string; variant_value?: string; sku?: string } | null
   }>
 }
@@ -87,7 +87,7 @@ export default function AdminOrderDetails({ orderId }: AdminOrderDetailsProps) {
           user:users(name, email, phone),
           items:order_items(
             *,
-            product:products(name, images, sku),
+            product:products(name, images),
             variant:product_variants(variant_type, variant_value, sku)
           )
         `)
@@ -202,7 +202,7 @@ export default function AdminOrderDetails({ orderId }: AdminOrderDetailsProps) {
                     {order.items?.map((item) => (
                       <tr key={item.id} className="border-b border-border/70 last:border-0">
                         <td className="py-4 pr-4"><div className="flex items-center gap-3"><div className="h-12 w-12 shrink-0 overflow-hidden rounded-md bg-muted">{item.product?.images?.[0] ? <img src={item.product.images[0]} alt="" className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center"><Package className="h-5 w-5 text-muted-foreground" /></div>}</div><span className="font-medium">{item.product?.name || 'Removed product'}</span></div></td>
-                        <td className="px-2 py-4 text-muted-foreground">{item.variant?.sku || item.product?.sku || '—'}{item.variant?.variant_value ? ` · ${item.variant.variant_value}` : ''}</td>
+                        <td className="px-2 py-4 text-muted-foreground">{item.variant?.sku || '—'}{item.variant?.variant_value ? ` · ${item.variant.variant_value}` : ''}</td>
                         <td className="px-2 py-4 text-right">{item.quantity}</td>
                         <td className="px-2 py-4 text-right">KSh {Number(item.price).toLocaleString()}</td>
                         <td className="py-4 pl-2 text-right font-semibold">KSh {(Number(item.price) * Number(item.quantity)).toLocaleString()}</td>
