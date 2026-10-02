@@ -28,6 +28,7 @@ import {
   Star,
   Zap,
   Book,
+  Mail,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase/client";
@@ -188,6 +189,11 @@ const AdminSidebar = memo(function AdminSidebar({ onNavigate }: { onNavigate?: (
       title: "Users",
       href: "/admin/users",
       icon: <Users className="h-5 w-5" />,
+    },
+    {
+      title: "Newsletter",
+      href: "/admin/newsletter",
+      icon: <Mail className="h-5 w-5" />,
     },
     {
       title: "Categories",

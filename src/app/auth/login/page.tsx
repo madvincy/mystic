@@ -176,6 +176,18 @@ export default function LoginPage() {
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           </form>
+
+          <div className="flex flex-col gap-3 border-t pt-4 text-center text-sm sm:flex-row sm:items-center sm:justify-between">
+            <Link href="/auth/forgot-password" className="font-medium text-pink-600 hover:underline">
+              Forgot password?
+            </Link>
+            <p className="text-muted-foreground">
+              New to Mystic?{' '}
+              <Link href="/auth/register" className="font-semibold text-pink-600 hover:underline">
+                Create an account
+              </Link>
+            </p>
+          </div>
         </CardContent>
       </Card>
     </div>

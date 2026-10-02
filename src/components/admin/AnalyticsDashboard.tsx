@@ -21,7 +21,8 @@ import {
   Truck,
   CheckCircle,
   XCircle,
-  Clock
+  Clock,
+  Mail,
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Link from 'next/link'
@@ -66,6 +67,8 @@ interface Analytics {
   total_orders: number
   total_users: number
   total_products: number
+  total_newsletter_subscribers: number
+  active_newsletter_subscribers: number
   average_order_value: number
   revenue_change: number
   orders_change: number
@@ -127,7 +130,7 @@ export default function AnalyticsDashboard() {
       const endStr = end.toISOString()
 
       // Fetch all data
-      const [ordersRes, usersRes, productsRes, orderItemsRes] = await Promise.all([
+      const [ordersRes, usersRes, productsRes, newsletterRes, activeNewsletterRes, orderItemsRes] = await Promise.all([
         supabase
           .from('orders')
           .select('*')
@@ -140,6 +143,13 @@ export default function AnalyticsDashboard() {
         supabase
           .from('products')
           .select('*', { count: 'exact', head: true }),
+        supabase
+          .from('newsletter_subscribers')
+          .select('*', { count: 'exact', head: true }),
+        supabase
+          .from('newsletter_subscribers')
+          .select('*', { count: 'exact', head: true })
+          .eq('status', 'active'),
         supabase
           .from('order_items')
           .select(`
@@ -207,6 +217,8 @@ export default function AnalyticsDashboard() {
         total_orders: totalOrders,
         total_users: usersRes.count || 0,
         total_products: productsRes.count || 0,
+        total_newsletter_subscribers: newsletterRes.count || 0,
+        active_newsletter_subscribers: activeNewsletterRes.count || 0,
         average_order_value: avgOrderValue,
         revenue_change: revenueChange,
         orders_change: 8.2,
@@ -413,6 +425,15 @@ export default function AnalyticsDashboard() {
       color: 'text-orange-600',
       bgColor: 'bg-orange-100 dark:bg-orange-900/30'
     },
+    {
+      label: 'Newsletter Subscribers',
+      value: analytics.total_newsletter_subscribers.toLocaleString(),
+      change: 0,
+      icon: Mail,
+      color: 'text-pink-600',
+      bgColor: 'bg-pink-100 dark:bg-pink-900/30',
+      detail: `${analytics.active_newsletter_subscribers.toLocaleString()} active`,
+    },
   ]
 
   const chartData = getChartData()
@@ -481,7 +502,7 @@ export default function AnalyticsDashboard() {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
         {stats.map((stat, index) => {
           const Icon = stat.icon
           const isPositive = stat.change >= 0
@@ -497,6 +518,7 @@ export default function AnalyticsDashboard() {
                 <div>
                   <p className="text-sm text-gray-500">{stat.label}</p>
                   <p className="text-2xl font-bold mt-1">{stat.value}</p>
+                  {'detail' in stat && <p className="mt-1 text-xs text-muted-foreground">{stat.detail}</p>}
                   <div className={`flex items-center gap-1 mt-2 text-sm ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
                     {isPositive ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
                     {Math.abs(stat.change)}%
