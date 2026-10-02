@@ -33,7 +33,7 @@ export default function ForgotPasswordPage() {
 
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth/reset-password`,
+        redirectTo: `${window.location.origin}/auth/callback?next=%2Fauth%2Freset-password`,
       })
 
       if (error) {
@@ -43,7 +43,7 @@ export default function ForgotPasswordPage() {
       }
 
       setIsSent(true)
-      toast.success('Password reset email sent!')
+      toast.success('If an account exists for that email, a reset link is on its way.')
     } catch (error: any) {
       setError(error.message || 'Failed to send reset email')
       toast.error('Failed to send reset email')

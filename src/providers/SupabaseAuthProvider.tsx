@@ -295,6 +295,7 @@ export function SupabaseAuthProvider({
       email,
       password,
       options: {
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
         data: {
           name,
         },
@@ -304,7 +305,7 @@ export function SupabaseAuthProvider({
     if (error) throw error;
 
     if (data.user) {
-      const { error: insertError } = await supabase.from("users").insert({
+      const { error: insertError } = await supabase.from("users").upsert({
         id: data.user.id,
         email: data.user.email,
         name: name,
@@ -312,11 +313,11 @@ export function SupabaseAuthProvider({
         address: "",
         city: "",
         country: "Kenya",
-        is_admin: email === process.env.NEXT_PUBLIC_ADMIN_EMAIL,
+        is_admin: false,
         is_banned: false,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
-      });
+      }, { onConflict: 'id', ignoreDuplicates: true });
 
       if (insertError) {
         console.error("Error creating user profile:", insertError);
@@ -335,7 +336,7 @@ export function SupabaseAuthProvider({
 
   const resetPassword = async (email: string) => {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth/reset-password`,
+      redirectTo: `${window.location.origin}/auth/callback?next=%2Fauth%2Freset-password`,
     });
     if (error) throw error;
   };

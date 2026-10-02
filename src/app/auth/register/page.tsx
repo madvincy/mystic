@@ -106,6 +106,7 @@ export default function RegisterPage() {
         email: formData.email,
         password: formData.password,
         options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
           data: {
             name: formData.name,
             phone: formData.phone,
@@ -123,34 +124,35 @@ export default function RegisterPage() {
         return
       }
 
-      // Create user in our users table
+      // Save profile safely if auth triggers/provider have not created it yet.
       if (data.user) {
         const { error: userError } = await supabase
           .from('users')
-          .insert({
+          .upsert({
             id: data.user.id,
             name: formData.name,
             email: formData.email,
             phone: formData.phone,
-            is_admin: formData.email === process.env.NEXT_PUBLIC_ADMIN_EMAIL,
+            address: '',
+            city: '',
+            country: 'Kenya',
+            is_admin: false,
+            is_banned: false,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
-          })
+          }, { onConflict: 'id', ignoreDuplicates: true })
 
         if (userError) {
           console.error('Error creating user profile:', userError)
         }
       }
 
-      toast.success('Account created successfully! 🎉')
-      
-      // If email confirmation is enabled
-      if (data.user?.identities?.length === 0) {
-        toast.info('Please check your email to verify your account')
-        router.push('/auth/verify-email')
-      } else {
-        // User is already confirmed (e.g., using magic link or OAuth)
+      if (data.session) {
+        toast.success('Account created successfully!')
         router.push('/')
+      } else {
+        toast.success('Check your email to confirm your account.')
+        router.push(`/auth/verify-email?email=${encodeURIComponent(formData.email.trim())}`)
       }
     } catch (error: any) {
       toast.error(error.message || 'Failed to create account')

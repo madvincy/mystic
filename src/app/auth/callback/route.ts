@@ -7,6 +7,8 @@ export async function GET(request: Request) {
   const requestUrl = new URL(request.url)
   const code = requestUrl.searchParams.get('code')
   const error = requestUrl.searchParams.get('error')
+  const requestedNext = requestUrl.searchParams.get('next')
+  const nextPath = requestedNext === '/auth/reset-password' ? requestedNext : '/'
 
   if (error) {
     return NextResponse.redirect(
@@ -46,7 +48,7 @@ export async function GET(request: Request) {
     await supabase.auth.exchangeCodeForSession(code)
     console.log('✅ Session exchanged successfully')
     
-    return NextResponse.redirect(new URL('/', request.url))
+    return NextResponse.redirect(new URL(nextPath, request.url))
   } catch (error: any) {
     console.error('❌ Callback error:', error)
     return NextResponse.redirect(

@@ -17,6 +17,7 @@ export default function VerifyEmailPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [verificationStatus, setVerificationStatus] = useState<'idle' | 'verifying' | 'success' | 'error'>('idle')
   const [errorMessage, setErrorMessage] = useState('')
+  const [email, setEmail] = useState(searchParams?.get('email') || '')
 
   const token = searchParams?.get('token')
   const type = searchParams?.get('type')
@@ -55,17 +56,17 @@ export default function VerifyEmailPage() {
   const resendVerificationEmail = async () => {
     setIsLoading(true)
     try {
-      // Get current user
       const { data: { user } } = await supabase.auth.getUser()
-      
-      if (!user) {
-        toast.error('Please login to resend verification email')
+      const targetEmail = user?.email || email.trim()
+
+      if (!targetEmail) {
+        toast.error('Enter your email address to resend the verification link.')
         return
       }
 
       const { error } = await supabase.auth.resend({
         type: 'signup',
-        email: user.email!,
+        email: targetEmail,
       })
 
       if (error) {
@@ -219,7 +220,7 @@ export default function VerifyEmailPage() {
             </motion.div>
             <CardTitle className="text-2xl font-bold">Verify Your Email</CardTitle>
             <CardDescription>
-              We've sent a verification link to your email address.
+              We've sent a verification link {email ? `to ${email}` : 'to your email address'}.
             </CardDescription>
           </CardHeader>
 

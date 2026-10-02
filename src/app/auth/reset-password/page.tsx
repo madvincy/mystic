@@ -26,36 +26,40 @@ export default function ResetPasswordPage() {
   const [isValidToken, setIsValidToken] = useState<boolean | null>(null)
 
   useEffect(() => {
-    // Check if we have a valid reset token
-    const checkToken = async () => {
-      const token = searchParams?.get('token')
-      const type = searchParams?.get('type')
-      
-      if (!token || type !== 'recovery') {
-        setIsValidToken(false)
-        return
-      }
+    let active = true
 
-      // Verify token with Supabase
+    const checkRecoverySession = async () => {
+      const tokenHash = searchParams?.get('token_hash') || searchParams?.get('token')
+      const type = searchParams?.get('type')
+
       try {
-        const { error } = await supabase.auth.verifyOtp({
-          token_hash: token,
-          type: 'recovery',
-        })
-        
-        if (error) {
-          setIsValidToken(false)
-          toast.error('Invalid or expired reset link')
-        } else {
-          setIsValidToken(true)
+        if (tokenHash && type === 'recovery') {
+          const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: 'recovery' })
+          if (active) setIsValidToken(!error)
+          if (error) toast.error('Invalid or expired reset link. Request a new one.')
+          return
         }
-      } catch {
-        setIsValidToken(false)
+
+        // PKCE recovery emails are exchanged for a session by /auth/callback.
+        const { data: { session }, error } = await supabase.auth.getSession()
+        if (!active) return
+        setIsValidToken(Boolean(session && !error))
+        if (!session || error) toast.error('Open this page from the password reset link in your email.')
+      } catch (error) {
+        if (active) setIsValidToken(false)
         toast.error('Invalid or expired reset link')
       }
     }
 
-    checkToken()
+    checkRecoverySession()
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY' && active) setIsValidToken(true)
+    })
+
+    return () => {
+      active = false
+      subscription.unsubscribe()
+    }
   }, [searchParams])
 
   const handleSubmit = async (e: React.FormEvent) => {
